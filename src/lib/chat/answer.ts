@@ -14,7 +14,14 @@ export type ChatEvent =
   | { type: "error"; message: string };
 
 function validEvidence(chunk: RetrievedChunk): boolean {
-  return Boolean(chunk.sourceId && chunk.title && chunk.content && Number.isFinite(chunk.similarity) && /^https?:\/\/[^\s]+$/.test(chunk.url));
+  return Boolean(chunk.sourceId && chunk.title && chunk.content && Number.isFinite(chunk.similarity) && chunk.similarity >= 0 && chunk.similarity <= 1 && /^https?:\/\/[^\s]+$/.test(chunk.url));
+}
+
+function comparisonSidesCovered(question: string, evidence: RetrievedChunk[]): boolean {
+  const match = question.match(/(?:compare|versus|vs\\.?|difference between)\\s+(.+?)(?:\\s+and\\s+|\\s+vs\\.?\\s+|\\s+versus\\s+)(.+?)(?:[?.,]|$)/i);
+  if (!match) return evidence.length >= 2;
+  const sides = match.slice(1, 3).map((side) => side.trim().toLowerCase());
+  return sides.every((side) => evidence.some((chunk) => chunk.content.toLowerCase().includes(side) || chunk.title.toLowerCase().includes(side) || (chunk.section ?? "").toLowerCase().includes(side)));
 }
 
 function formatEvidence(evidence: RetrievedChunk[]): string {
@@ -35,7 +42,7 @@ export async function* streamGroundedAnswer(input: {
   }
 
   const evidence = input.evidence.filter(validEvidence);
-  if (!evidence.length || (policy.requireComparisonSides && evidence.length < 2)) {
+  if (!evidence.length || (policy.requireComparisonSides && !comparisonSidesCovered(input.question, evidence))) {
     yield { type: "delta", text: policy.insufficientComparisonResponse ?? UNKNOWN_RESPONSE };
     yield { type: "done" };
     return;
