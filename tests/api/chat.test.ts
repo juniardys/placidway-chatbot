@@ -1,7 +1,8 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterAll, describe, expect, test, vi } from "vitest";
 
 vi.mock("../../src/lib/llm/client", () => ({ getEmbeddings: () => ({ embedQuery: vi.fn(async () => Array(1536).fill(0)) }) }));
 vi.mock("../../src/lib/db/client", () => ({ getServerSupabase: () => ({ rpc: vi.fn(async () => ({ data: [], error: null })) }) }));
+afterAll(() => { vi.restoreAllMocks(); });
 
 import { POST } from "../../src/app/api/chat/route";
 
