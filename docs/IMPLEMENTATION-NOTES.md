@@ -21,7 +21,7 @@ Dokumen ini melengkapi PRD, design spec, dan implementation plan. Sesi implement
 - RAG vector database: PostgreSQL + pgvector is not configured in current runtime; `DATABASE_URL` is intentionally removed until that adapter is activated.
 - Runtime/package manager: Bun.
 - Automatic refresh: `node-cron` in persistent Bun server runtime.
-- Manual refresh: `POST /api/admin/refresh`.
+- Manual refresh: public `POST /api/refresh`, triggered by the "Refresh content" button in the chat UI.
 - Cron defaults: `0 3 * * *`, timezone `UTC`.
 - Cron overlap: `noOverlap: true` plus shared refresh lock.
 - Active snapshot stays available after failed refresh.
@@ -39,7 +39,6 @@ These values are intentionally not invented:
 - `LLM_MODEL` supported by 9router.
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for Supabase SSR/Data API.
 - New rotated `LLM_API_KEY`.
-- `REFRESH_SECRET`.
 - Deployment target and public hostname.
 
 Implementation may proceed with placeholders and mocked/seeded tests. Real ingestion must refuse to start if source URLs are placeholders or if required production env values are missing.
@@ -66,7 +65,6 @@ LLM_API_KEY=
 LLM_MODEL=
 EMBEDDING_MODEL=sumo/text-embedding-3-small
 EMBEDDING_DIMENSIONS=1536
-REFRESH_SECRET=
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 INGESTION_CRON_SCHEDULE=0 3 * * *
@@ -126,7 +124,7 @@ The route validates input, limits history to `MAX_HISTORY_MESSAGES`, and never s
 
 ## Refresh contract
 
-Both cron and manual endpoint call:
+Both cron and the public refresh endpoint call:
 
 ```ts
 refreshKnowledgeBase(): Promise<RefreshResult>
@@ -147,14 +145,13 @@ Refresh steps:
 11. On any failure, keep old active snapshot and return failure details without exposing source secrets.
 12. Release lock in `finally`.
 
-Manual endpoint:
+Manual endpoint (public, no auth; the chat UI's "Refresh content" button calls it):
 
 ```http
-POST /api/admin/refresh
-Authorization: Bearer <REFRESH_SECRET>
+POST /api/refresh
 ```
 
-Return `401` for missing/invalid secret, `409` for active refresh if not safely skipped, `200` for successful or unchanged refresh, and `500` for failed refresh while old snapshot remains active.
+Return `409` when a refresh is already running, `200` for successful or unchanged refresh, and `500` for failed refresh while old snapshot remains active.
 
 ## Runtime and deployment
 
@@ -201,5 +198,27 @@ Then verify manually:
 - Out-of-scope refusal.
 - Medical disclaimer.
 - Trick-price rejection.
-- Manual refresh auth and failure preservation.
+- Manual refresh status mapping and failure preservation.
 - Cron startup in persistent Node runtime.
+
+## Lead capture and content gaps
+
+- The agent has a second tool, `request_free_quote`. When the user asks for a quote, a personal estimate, to be contacted, or to book, the model calls it and the stream emits `lead_offer`; the UI then shows a name/email form under that answer.
+- The form posts to public `POST /api/leads` (`name`, `email`, optional `message`, optional `sessionId`), stored in the `leads` table (migration `003_leads_and_content_gaps.sql`, service-role only).
+- Content gaps are logged to `chat_logs`. `answer_status = 'unanswered'` means the search returned no evidence, or the model started its reply with `[[NO_ANSWER]]`: the answer carries no citations. `answer_status = 'partial'` means the model started with `[[PARTIAL_ANSWER]]`: it answered part of the question from evidence and keeps its citations. Markers are stripped before streaming, and both cases offer the quote form.
+- Content gaps: `select * from content_gaps;` groups unanswered and partial questions by text with counts and last-asked time.
+
+## Retrieval and citations
+
+- The search tool embeds the model's rewritten query and, when it differs, the user's original wording too; up to two extra chunks from the original wording are added so a rewrite that narrows the question (for example to a treatment named earlier) does not hide relevant pages.
+- Citations list only pages the answer drew on: a page is cited when the answer contains a word or number distinctive to that page's title or evidence among the retrieved pages. When nothing is distinctive (for example a fully translated answer), every retrieved page is cited.
+
+## Answer style
+
+- The configured model (`LLM_MODEL=placidway` on the LLM router) writes telegraphic text by default. `STYLE_INSTRUCTION` is appended last to every system message, and the quote reply gets a worked example; short English replies can still drop a few articles. Removing the style rule from the router's model combo fixes it at the source.
+
+## Language, follow-ups, disclaimer
+
+- Answers follow the language of the user's latest message; the search query is rewritten as a standalone English query, so non-English questions still match English pages.
+- Follow-ups use chat history to resolve references ("what about in Turkey?") in the search query.
+- A doctor reminder is added only for safety/suitability/side-effect/own-condition questions, and not again once given in the conversation.

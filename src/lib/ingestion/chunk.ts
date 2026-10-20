@@ -23,6 +23,7 @@ export function chunkByHeading(
   let section = "Document";
   let buffer = "";
   let bufferSection = section;
+  let lastSection = "";
   const add = (content: string, chunkSection: string) => {
     if (content.trim())
       chunks.push({
@@ -36,10 +37,13 @@ export function chunkByHeading(
     add(buffer, bufferSection);
     buffer = "";
   };
+  // Write the heading once per run of blocks under it, not once per block.
   const append = (text: string) => {
-    if (buffer && buffer.length + text.length + 2 > maxChars) flush();
+    const labelled = () => (buffer && lastSection === section ? text : `${section}\n${text}`);
+    if (buffer && buffer.length + labelled().length + 2 > maxChars) flush();
     if (!buffer) bufferSection = section;
-    buffer = buffer ? `${buffer}\n\n${text}` : text;
+    buffer = buffer ? `${buffer}\n\n${labelled()}` : labelled();
+    lastSection = section;
   };
   for (const block of markdown.split(/\n\s*\n/)) {
     const heading = block.match(/^#{1,6}\s+(.+)$/m);
@@ -57,7 +61,7 @@ export function chunkByHeading(
       add(`${section}\n${remaining.slice(0, at)}`.slice(0, maxChars), section);
       remaining = remaining.slice(at).trimStart();
     }
-    if (remaining) append(`${section}\n${remaining}`);
+    if (remaining) append(remaining);
   }
   flush();
   return chunks;

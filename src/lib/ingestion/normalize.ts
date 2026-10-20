@@ -67,13 +67,16 @@ export function extractMainContent(markdown: string): string {
     .trim();
 }
 
+// Bump when chunking or embedding input changes so unchanged pages are re-indexed.
+const INDEX_VERSION = "2";
+
 export async function normalizeSource(
   raw: RawSnapshot,
 ): Promise<NormalizedDocument> {
   const { title, markdown } = htmlToMarkdown(raw.html);
   const hash = await crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(markdown),
+    new TextEncoder().encode(`${INDEX_VERSION}\n${markdown}`),
   );
   const sections: string[] = [];
   let heading = title;

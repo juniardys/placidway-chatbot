@@ -7,7 +7,6 @@ describe("server environment", () => {
       LLM_ENDPOINT: "https://example.test/v1",
       LLM_API_KEY: "key",
       LLM_MODEL: "model",
-      REFRESH_SECRET: "secret",
     });
     expect(env.EMBEDDING_MODEL).toBe("sumo/text-embedding-3-small");
     expect(env.EMBEDDING_DIMENSIONS).toBe(1536);

@@ -84,8 +84,10 @@ export async function refreshKnowledgeBase(
     if (!documents.length) return { status: "unchanged", sources, chunks: 0 };
     const atomicSources: AtomicRefreshSource[] = [];
     for (const { source, doc, parts } of documents) {
+      // Prefix the page title so chunks like "Included in the Out-Patient Program"
+      // still match questions that name the treatment the page is about.
       const vectors = await embedding.embedDocuments(
-        parts.map((part) => part.content),
+        parts.map((part) => `${doc.title}\n${part.content}`),
       );
       if (vectors.length !== parts.length) throw new Error("Embedding failed");
       atomicSources.push({

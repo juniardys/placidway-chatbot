@@ -6,7 +6,6 @@ const schema = z.object({
   LLM_MODEL: z.string().min(1),
   EMBEDDING_MODEL: z.string().default("sumo/text-embedding-3-small"),
   EMBEDDING_DIMENSIONS: z.coerce.number().int().default(1536),
-  REFRESH_SECRET: z.string().min(1),
   INGESTION_CRON_SCHEDULE: z.string().default("0 3 * * *"),
   INGESTION_CRON_TIMEZONE: z.string().default("UTC"),
   INGESTION_USER_AGENT: z.string().default("PlacidWayKnowledgeBot/1.0"),

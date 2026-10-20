@@ -8,7 +8,6 @@ describe("provider configuration", () => {
     process.env.LLM_MODEL = "chat-model";
     process.env.EMBEDDING_MODEL = "sumo/text-embedding-3-small";
     process.env.EMBEDDING_DIMENSIONS = "1536";
-    process.env.REFRESH_SECRET = "secret";
     const chat = getChatModel() as unknown as {
       model: string;
       clientConfig: { baseURL?: string };

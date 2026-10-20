@@ -1,5 +1,14 @@
-.reset-chat {
+.topbar-actions {
+  display: flex;
+  gap: 8px;
   margin-left: auto;
+}
+.refresh-notice {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.reset-chat {
   padding: 8px 14px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -22,4 +31,79 @@
 .reset-chat:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.lead-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+}
+.lead-form-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+}
+.lead-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.lead-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.lead-form input,
+.lead-form textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+.lead-form input:focus-visible,
+.lead-form textarea:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+.lead-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #b42318;
+}
+.lead-form-actions button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--blue);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lead-form-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.lead-form-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.lead-form-done {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--ink);
 }

@@ -17,6 +17,9 @@ export type AgentEvent =
   | { type: "answer_start" }
   | { type: "delta"; text: string }
   | { type: "citation"; citation: Citation }
+  | { type: "lead_offer" }
+  /** Content gap for logging; `partial` means part of the question was answered. Never sent to the browser. */
+  | { type: "unanswered"; partial?: boolean }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -28,7 +31,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     return typeof event.message === "string" || typeof event.text === "string";
   if (event.type === "tool_result")
     return Number.isInteger(event.sources) && Number(event.sources) >= 0 && Number.isInteger(event.chunks) && Number(event.chunks) >= 0;
-  return ["tool_start", "answer_start", "citation", "done", "error"].includes(event.type);
+  return ["tool_start", "answer_start", "citation", "lead_offer", "unanswered", "done", "error"].includes(event.type);
 }
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };

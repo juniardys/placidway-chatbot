@@ -1,5 +1,5 @@
 import { streamAgentAnswer, decideAndAnswer } from "../../../lib/agent/chat-agent";
-import { createPlacidWaySearchTool } from "../../../lib/agent/tools";
+import { createPlacidWaySearchTool, createQuoteRequestTool } from "../../../lib/agent/tools";
 import {
   MAX_HISTORY_CONTENT_LENGTH,
   MAX_HISTORY_MESSAGES,
@@ -66,11 +66,13 @@ export async function POST(request: Request) {
     const tool = createPlacidWaySearchTool({
       embed: (text) => embeddings.embedQuery(text),
       retrieve: (vector, limit) => repository.getActiveChunks(vector, limit),
+      originalQuestion: question,
     });
     const sessions = createSessionStore(supabase);
     const stream = new ReadableStream({
       async start(controller) {
         let status = "completed";
+        let gap: "unanswered" | "partial" | undefined;
         let answer = "";
         const citations: StoredCitation[] = [];
         try {
@@ -80,6 +82,7 @@ export async function POST(request: Request) {
             run: () => decideAndAnswer({
               model: getChatModel(),
               tool,
+              quoteTool: createQuoteRequestTool(),
               question,
               history,
               signal: request.signal,
@@ -88,6 +91,11 @@ export async function POST(request: Request) {
             if (request.signal.aborted) {
               status = "aborted";
               break;
+            }
+            // "unanswered" is a server-side signal for content-gap logging only.
+            if (event.type === "unanswered") {
+              gap = event.partial ? "partial" : "unanswered";
+              continue;
             }
             controller.enqueue(`data: ${JSON.stringify(event)}\n\n`);
             if (event.type === "error") status = "error";
@@ -108,7 +116,8 @@ export async function POST(request: Request) {
               `data: ${JSON.stringify({ type: "error", message: "Unable to generate an answer" })}\n\n`,
             );
         } finally {
-          void repository.logChatOutcome({ question, status }).catch(() => {
+          const outcome = status === "completed" && gap ? gap : status;
+          void repository.logChatOutcome({ question, status: outcome }).catch(() => {
             /* logging must not break stream */
           });
           // Only completed turns are stored, matching what the UI keeps.

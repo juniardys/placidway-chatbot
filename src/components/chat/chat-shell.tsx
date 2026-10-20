@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ActivityStep, AgentActivity } from "./agent-activity";
+import { LeadForm } from "./lead-form";
 import { RichText } from "./rich-text";
 import { useChatSession } from "./use-chat-session";
 import "./chat-session.css";
@@ -13,6 +14,8 @@ type Message = {
   citations?: Citation[];
   activity?: ActivityStep[];
   durationMs?: number;
+  /** Set when the assistant offered the free-quote form for this answer. */
+  leadOffer?: { sessionId?: string };
 };
 
 const REQUEST_TIMEOUT_MS = 90_000;
@@ -30,6 +33,8 @@ export function ChatShell() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState<Message | null>(null);
   const [lastQuestion, setLastQuestion] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState("");
   const conversationRef = useRef<HTMLElement>(null);
   const session = useChatSession((stored) =>
     setMessages(
@@ -50,6 +55,24 @@ export function ChatShell() {
     setLastQuestion("");
   }
 
+  async function refreshContent() {
+    if (refreshing) return;
+    setRefreshing(true);
+    setRefreshNotice("");
+    try {
+      const response = await fetch("/api/refresh", { method: "POST" });
+      const result = await response.json().catch(() => ({}));
+      if (response.status === 409) setRefreshNotice("A content refresh is already running.");
+      else if (!response.ok) setRefreshNotice("Content refresh failed. The previous content is still in use.");
+      else if (result.status === "unchanged") setRefreshNotice("Content is already up to date.");
+      else setRefreshNotice("Content refreshed from PlacidWay pages.");
+    } catch {
+      setRefreshNotice("Content refresh failed. The previous content is still in use.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   useEffect(() => {
     const node = conversationRef.current;
     if (node) node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
@@ -67,13 +90,15 @@ export function ChatShell() {
     let answer = "";
     let citations: Citation[] = [];
     let activity: ActivityStep[] = [];
+    let leadOffer: Message["leadOffer"];
     const startedAt = performance.now();
     const settle = () => activity.map((step) => ({ ...step, status: "done" as const }));
-    const publish = () => setPending({ role: "assistant", text: answer, citations, activity });
+    let sessionId: string | undefined;
+    const publish = () => setPending({ role: "assistant", text: answer, citations, activity, leadOffer });
     publish();
     try {
       // Chat still works if the session cannot be created; it just won't persist.
-      const sessionId = await session.ensureSessionId().catch(() => undefined);
+      sessionId = await session.ensureSessionId().catch(() => undefined);
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -111,6 +136,7 @@ export function ChatShell() {
           if (event.type === "answer_start")
             activity = [...settle(), { kind: "compose", label: "Writing a grounded answer", status: "running" }];
           if (event.type === "delta") answer += event.text;
+          if (event.type === "lead_offer") leadOffer = { sessionId };
           if (event.type === "citation" && !citations.some((item) => item.url === event.citation.url))
             citations = [...citations, { title: event.citation.title, url: event.citation.url }];
           if (event.type === "error") throw new Error(event.message);
@@ -121,7 +147,7 @@ export function ChatShell() {
       if (!answer) throw new Error("Empty answer");
       setMessages((current) => [
         ...current,
-        { role: "assistant", text: answer, citations, activity: settle(), durationMs: performance.now() - startedAt },
+        { role: "assistant", text: answer, citations, activity: settle(), durationMs: performance.now() - startedAt, leadOffer },
       ]);
     } catch {
       // Drop the unanswered question so Retry does not duplicate it in history.
@@ -149,17 +175,33 @@ export function ChatShell() {
             <p className="brand-name">PlacidWay</p>
             <p className="brand-subtitle">Care, made clearer</p>
           </div>
-          {messages.length > 0 ? (
+          <div className="topbar-actions">
             <button
               type="button"
               className="reset-chat"
-              onClick={resetChat}
-              disabled={loading}
+              onClick={() => void refreshContent()}
+              disabled={refreshing}
+              aria-busy={refreshing}
             >
-              New chat
+              {refreshing ? "Refreshing…" : "Refresh content"}
             </button>
-          ) : null}
+            {messages.length > 0 ? (
+              <button
+                type="button"
+                className="reset-chat"
+                onClick={resetChat}
+                disabled={loading}
+              >
+                New chat
+              </button>
+            ) : null}
+          </div>
         </header>
+        {refreshNotice ? (
+          <p className="refresh-notice" role="status">
+            {refreshNotice}
+          </p>
+        ) : null}
 
         <section
           className="conversation"
@@ -261,6 +303,7 @@ function AssistantMessage({ message, live = false }: { message: Message; live?: 
             <i />
           </div>
         ) : null}
+        {message.leadOffer && !live ? <LeadForm sessionId={message.leadOffer.sessionId} /> : null}
         {citations.length && !live ? (
           <div className="sources">
             <span className="sources-label">Sources</span>
