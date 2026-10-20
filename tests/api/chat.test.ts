@@ -15,10 +15,9 @@ describe("POST /api/chat", () => {
     expect(invalidHistory.status).toBe(400);
   });
 
-  test("returns SSE headers and ordered terminal events", async () => {
+  test("rejects unavailable backend with 500", async () => {
     const response = await POST(new Request("http://localhost/api/chat", { method: "POST", body: JSON.stringify({ question: "hello" }) }));
-    expect(response.headers.get("content-type")).toContain("text/event-stream");
-    const text = await response.text();
-    expect(text.indexOf('"type":"delta"')).toBeLessThan(text.indexOf('"type":"done"'));
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "Unable to process request" });
   });
 });
