@@ -15,4 +15,9 @@ test("migration defines pgvector active search RPC", () => {
   expect(sql).toContain("match_threshold > 0");
   expect(sql).toContain("match_count > 0");
   expect(sql).toContain("p_status not in ('pending', 'active', 'failed')");
+  expect(sql).toContain("create temporary table batch_snapshots");
+  expect(sql).toContain("from batch_snapshots b where k.id = b.snapshot_id");
+  expect(sql).toContain("where c.snapshot_id = b.snapshot_id");
+  expect(sql).toContain("from batch_snapshots b where s.id = b.source_id");
+  expect(sql).toContain("pg_advisory_xact_lock");
 });

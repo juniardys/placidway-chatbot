@@ -152,6 +152,7 @@ create or replace function refresh_knowledge_base(p_sources jsonb)
 returns void language plpgsql security definer set search_path = public, pg_temp as $$
 declare x jsonb; snapshot_id uuid; batch_id uuid := gen_random_uuid();
 begin
+ create temporary table batch_snapshots (snapshot_id uuid primary key, source_id text not null, content_hash text not null) on commit drop;
  if jsonb_typeof(p_sources) <> 'array' or jsonb_array_length(p_sources) = 0 then raise exception 'Refresh payload must be non-empty'; end if;
  if exists (select 1 from jsonb_array_elements(p_sources) x where jsonb_typeof(x->'chunks') <> 'array' or jsonb_array_length(x->'chunks') = 0 or x->>'source_id' is null or x->>'content_hash' is null) then raise exception 'Malformed refresh payload'; end if;
  if exists (select 1 from jsonb_array_elements(p_sources) x, jsonb_array_elements(x->'chunks') c where jsonb_array_length(c->'embedding') <> 1536) then raise exception 'Invalid embedding dimensions'; end if;
@@ -159,14 +160,16 @@ begin
  for x in select * from jsonb_array_elements(p_sources) loop
   insert into knowledge_snapshots(source_id, raw_content, normalized_markdown, content_hash, status, error) values (x->>'source_id', x->>'raw_content', x->>'normalized_markdown', x->>'content_hash', 'pending', batch_id::text) returning id into snapshot_id;
   insert into knowledge_chunks(source_id, snapshot_id, text_content, embedding, section, content_hash) select x->>'source_id', snapshot_id, c->>'content', (c->'embedding')::text::vector, nullif(c->>'section','null'), nullif(c->>'content_hash','null') from jsonb_array_elements(x->'chunks') c;
+  insert into batch_snapshots(snapshot_id, source_id, content_hash) values (snapshot_id, x->>'source_id', x->>'content_hash');
  end loop;
- update knowledge_snapshots set active = false where active = true and source_id in (select x->>'source_id' from jsonb_array_elements(p_sources) x);
- update knowledge_chunks set active = false where active = true and source_id in (select x->>'source_id' from jsonb_array_elements(p_sources) x);
- update knowledge_snapshots set active = true, status = 'active', error = null where error = batch_id::text;
- update knowledge_chunks set active = true where snapshot_id in (select id from knowledge_snapshots where error = batch_id::text);
- update knowledge_sources s set latest_content_hash = k.content_hash, updated_at = now() from knowledge_snapshots k where k.active = true and k.source_id = s.id and k.error = batch_id::text;
+ update knowledge_snapshots set active = false where active = true and source_id in (select source_id from batch_snapshots);
+ update knowledge_chunks set active = false where active = true and source_id in (select source_id from batch_snapshots);
+ update knowledge_snapshots k set active = true, status = 'active', error = null from batch_snapshots b where k.id = b.snapshot_id;
+ update knowledge_chunks c set active = true from batch_snapshots b where c.snapshot_id = b.snapshot_id;
+ update knowledge_sources s set latest_content_hash = b.content_hash, updated_at = now() from batch_snapshots b where s.id = b.source_id;
 end; $$;
 revoke all on function get_active_source_hashes() from public, anon, authenticated;
 grant execute on function get_active_source_hashes() to service_role;
 revoke all on function refresh_knowledge_base(jsonb) from public, anon, authenticated;
 grant execute on function refresh_knowledge_base(jsonb) to service_role;
+
