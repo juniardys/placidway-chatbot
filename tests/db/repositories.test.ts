@@ -11,7 +11,7 @@ describe("repository", () => {
       },
     };
     const result = await createRepository(client).getActiveChunks(Array(1536).fill(0.1), 6);
-    expect(result[0]).toMatchObject({ id: "c1", text: "facts", score: 0.9, sourceId: "s1" });
+    expect(result[0]).toMatchObject({ id: "c1", content: "facts", similarity: 0.9, sourceId: "s1" });
     expect(calls[0]).toEqual(["match_knowledge_chunks", expect.objectContaining({ match_count: 6, match_threshold: 0.72 })]);
   });
 
