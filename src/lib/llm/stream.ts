@@ -1,7 +1,7 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 
-export async function* streamModel(model: BaseChatModel, messages: unknown): AsyncIterable<string> {
-  const stream = await model.stream(messages as never);
+export async function* streamModel(model: BaseChatModel, messages: unknown, signal?: AbortSignal): AsyncIterable<string> {
+  const stream = await model.stream(messages as never, signal ? { signal } : undefined);
   for await (const chunk of stream) {
     const content = chunk.content;
     if (typeof content === "string") yield content;

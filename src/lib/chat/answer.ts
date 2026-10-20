@@ -33,6 +33,7 @@ export async function* streamGroundedAnswer(input: {
   history?: ChatMessage[];
   evidence: RetrievedChunk[];
   model?: BaseChatModel;
+  signal?: AbortSignal;
 }): AsyncIterable<ChatEvent> {
   const policy = classifyQuestion(input.question);
   if (policy.response) {
@@ -55,7 +56,7 @@ export async function* streamGroundedAnswer(input: {
   ];
 
   try {
-    for await (const text of streamModel(input.model ?? getChatModel(), messages)) {
+    for await (const text of streamModel(input.model ?? getChatModel(), messages, input.signal)) {
       if (text) yield { type: "delta", text };
     }
     yield { type: "citations", citations: evidence.map(({ sourceId, title, url }) => ({ sourceId, title, url })) };

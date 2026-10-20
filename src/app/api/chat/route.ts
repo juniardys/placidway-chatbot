@@ -7,7 +7,8 @@ import { retrieveEvidence, type ChatMessage } from "../../../lib/retrieval/retri
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { question?: unknown; history?: unknown };
+    let body: { question?: unknown; history?: unknown };
+    try { body = await request.json(); } catch { return Response.json({ error: "Invalid JSON" }, { status: 400 }); }
     if (typeof body.question !== "string") return Response.json({ error: "Invalid question" }, { status: 400 });
     const question = body.question.trim();
     if (!question || question.length > MAX_QUESTION_LENGTH) return Response.json({ error: "Invalid question" }, { status: 400 });
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
       async start(controller) {
         let status = "completed";
         try {
-          for await (const event of streamGroundedAnswer({ question, history, evidence })) {
+          for await (const event of streamGroundedAnswer({ question, history, evidence, signal: request.signal })) {
             if (request.signal.aborted) { status = "aborted"; break; }
             controller.enqueue(`data: ${JSON.stringify(event)}\n\n`);
             if (event.type === "error") status = "error";
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
           status = request.signal.aborted ? "aborted" : "error";
           if (!request.signal.aborted) controller.enqueue(`data: ${JSON.stringify({ type: "error", message: "Unable to generate an answer" })}\n\n`);
         } finally {
-          try { await repository.logChatOutcome({ question, status }); } catch { /* logging must not break stream */ }
+          void repository.logChatOutcome({ question, status }).catch(() => { /* logging must not break stream */ });
           try { controller.close(); } catch { /* already closed */ }
         }
       },
