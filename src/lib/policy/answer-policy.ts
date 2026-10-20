@@ -1,27 +1,78 @@
+import {
+  APPOINTMENT_RESPONSE,
+  MEDICAL_DISCLAIMER,
+  OUT_OF_SCOPE_RESPONSE,
+  UNKNOWN_RESPONSE,
+} from "../constants";
+
+export type PolicyKind =
+  | "factual"
+  | "cost"
+  | "comparison"
+  | "package"
+  | "follow-up"
+  | "appointment"
+  | "out-of-scope"
+  | "medical"
+  | "unsupported-premise";
+
 export type PolicyDecision = {
-  kind: "answer" | "unknown" | "medical" | "appointment" | "out-of-scope";
+  kind: PolicyKind;
+  requireEvidence?: boolean;
+  requireComparisonSides?: boolean;
   response?: string;
+  disclaimerRequired?: boolean;
 };
-export function classifyQuestion(q: string): PolicyDecision {
-  const s = q.toLowerCase();
-  if (/diagnos|safe for me|should i take|am i a candidate/.test(s))
+
+const has = (value: string, pattern: RegExp) => pattern.test(value);
+
+/** Classify before retrieval/model generation. Rules intentionally stay conservative. */
+export function classifyQuestion(question: string): PolicyDecision {
+  const s = question.trim().toLowerCase();
+
+  if (
+    has(s, /diagnos|safe for me|is it safe|should i take|am i a candidate|recommend.*treatment|what treatment.*for me/) 
+  ) {
     return {
       kind: "medical",
-      response:
-        "I can provide information from PlacidWay pages, but cannot diagnose or determine whether treatment is safe for you. Please consult a qualified doctor.",
+      response: MEDICAL_DISCLAIMER,
+      disclaimerRequired: true,
     };
-  if (/book|appointment|schedule/.test(s))
-    return {
-      kind: "appointment",
-      response:
-        "I cannot book appointments. Please contact PlacidWay for assistance or a free quote.",
-    };
-  if (/weather|stock price|politics|recipe/.test(s))
-    return {
-      kind: "out-of-scope",
-      response:
-        "I can only answer questions about information in the approved PlacidWay content.",
-    };
-  return { kind: "answer" };
+  }
+
+  if (has(s, /book|appointment|schedule|reserve|availability.*clinic|available.*appointment/)) {
+    return { kind: "appointment", response: APPOINTMENT_RESPONSE };
+  }
+
+  if (has(s, /weather|stock price|politic|recipe|sports score|joke|write.*code|latest news/)) {
+    return { kind: "out-of-scope", response: OUT_OF_SCOPE_RESPONSE };
+  }
+
+  // A stated amount is not evidence of the actual price. Refuse premise instead of guessing.
+  if (has(s, /\$\s*\d|\b\d[\d,]*(?:\.\d+)?\s*(?:usd|dollars?|€|eur|£|gbp)\b/)) {
+    return { kind: "unsupported-premise", requireEvidence: true, response: UNKNOWN_RESPONSE };
+  }
+
+  if (has(s, /compare|comparison|versus|\bvs\.?\b|difference between|which is (?:cheaper|better)/)) {
+    return { kind: "comparison", requireEvidence: true, requireComparisonSides: true };
+  }
+
+  if (has(s, /price|cost|how much|fee|starting from|expensive|budget|料金/)) {
+    return { kind: "cost", requireEvidence: true };
+  }
+
+  if (has(s, /package|what(?:'s| is) included|includes|inclusions|procedure|treatment.*include/)) {
+    return { kind: "package", requireEvidence: true };
+  }
+
+  if (
+    has(s, /\b(it|that|this|they|there)\b|what about|how long|recovery|after (?:that|the procedure)|and what/) &&
+    has(s, /\b(about|after|then|also|that|this|it|they|there)\b|\?$/)
+  ) {
+    return { kind: "follow-up", requireEvidence: true };
+  }
+
+  return { kind: "factual", requireEvidence: true };
 }
+
 export { UNKNOWN_RESPONSE } from "../constants";
