@@ -7,27 +7,38 @@ import { retrieveEvidence, type ChatMessage } from "../../../lib/retrieval/retri
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { question?: string; history?: ChatMessage[] };
-    const question = body.question?.trim();
+    const body = await request.json() as { question?: unknown; history?: unknown };
+    if (typeof body.question !== "string") return Response.json({ error: "Invalid question" }, { status: 400 });
+    const question = body.question.trim();
     if (!question || question.length > MAX_QUESTION_LENGTH) return Response.json({ error: "Invalid question" }, { status: 400 });
-    const history = Array.isArray(body.history)
-      ? body.history.filter((item): item is ChatMessage => (item.role === "user" || item.role === "assistant") && typeof item.content === "string").map((item) => ({ ...item, content: item.content.slice(0, MAX_HISTORY_CONTENT_LENGTH) })).slice(-MAX_HISTORY_MESSAGES)
-      : [];
+    if (body.history !== undefined && !Array.isArray(body.history)) return Response.json({ error: "Invalid history" }, { status: 400 });
+    const rawHistory = (body.history ?? []) as unknown[];
+    if (rawHistory.some((item) => !item || typeof item !== "object" || !((item as Record<string, unknown>).role === "user" || (item as Record<string, unknown>).role === "assistant") || typeof (item as Record<string, unknown>).content !== "string")) {
+      return Response.json({ error: "Invalid history" }, { status: 400 });
+    }
+    const history = rawHistory.map((item) => { const value = item as ChatMessage; return { role: value.role, content: value.content.slice(0, MAX_HISTORY_CONTENT_LENGTH) }; }).slice(-MAX_HISTORY_MESSAGES);
     const embeddings = getEmbeddings();
     const supabase = getServerSupabase();
     const repository = createRepository({ rpc: async (name, args) => supabase.rpc(name, args) });
     const evidence = await retrieveEvidence(question, history, {
-      embed: async (text) => (await embeddings.embedQuery(text)),
+      embed: async (text) => embeddings.embedQuery(text),
       retrieve: (vector, limit) => repository.getActiveChunks(vector, limit),
     });
     const stream = new ReadableStream({
       async start(controller) {
+        let status = "completed";
         try {
-          for await (const event of streamGroundedAnswer({ question, history, evidence })) controller.enqueue(`data: ${JSON.stringify(event)}\n\n`);
+          for await (const event of streamGroundedAnswer({ question, history, evidence })) {
+            if (request.signal.aborted) { status = "aborted"; break; }
+            controller.enqueue(`data: ${JSON.stringify(event)}\n\n`);
+            if (event.type === "error") status = "error";
+          }
         } catch {
-          controller.enqueue(`data: ${JSON.stringify({ type: "error", message: "Unable to generate an answer" })}\n\n`);
+          status = request.signal.aborted ? "aborted" : "error";
+          if (!request.signal.aborted) controller.enqueue(`data: ${JSON.stringify({ type: "error", message: "Unable to generate an answer" })}\n\n`);
         } finally {
-          controller.close();
+          try { await repository.logChatOutcome({ question, status }); } catch { /* logging must not break stream */ }
+          try { controller.close(); } catch { /* already closed */ }
         }
       },
     });
