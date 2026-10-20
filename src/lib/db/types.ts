@@ -39,7 +39,9 @@ export type ChunkInput = {
   contentHash?: string | null;
 };
 
-export type AtomicRefreshSource = { sourceId: string; rawContent: string; normalizedMarkdown: string; contentHash: string; chunks: ChunkInput[] };
+export type AtomicRefreshChunk = { content: string; embedding: number[]; section?: string | null; contentHash?: string | null };
+export type AtomicRefreshSource = { sourceId: string; rawContent: string; normalizedMarkdown: string; contentHash: string; chunks: AtomicRefreshChunk[] };
+export type RefreshRepository = Pick<Repository, "getActiveHashes" | "refreshAtomically">;
 
 export type Repository = {
   getActiveChunks(queryEmbedding: number[], limit: number): Promise<RetrievedChunk[]>;

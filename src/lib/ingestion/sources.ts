@@ -5,6 +5,12 @@ export function assertAllowedSource(url: string): AllowedSource {
   if (!source) throw new Error("Source URL is not allowlisted");
   return source;
 }
+export function validateSourceFixture(list: typeof SOURCES): void {
+  if (list.length !== 7) throw new Error("Fixture requires exactly seven sources");
+  const ids = new Set(list.map((source) => source.id));
+  const urls = new Set(list.map((source) => source.url));
+  if (ids.size !== 7 || urls.size !== 7) throw new Error("Fixture sources must have unique IDs and URLs");
+}
 export function validateProductionSources(list: typeof SOURCES = SOURCES) {
   if (list.length !== 7) throw new Error("Production requires exactly seven sources");
   const ids = new Set(list.map((source) => source.id));

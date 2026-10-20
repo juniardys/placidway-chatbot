@@ -1,4 +1,4 @@
-import type { ChatLogInput, ChunkInput, Repository, RepositoryClient, RetrievedChunk, SourceSnapshotInput } from "./types";
+import type { AtomicRefreshSource, ChatLogInput, ChunkInput, Repository, RepositoryClient, RetrievedChunk, SourceSnapshotInput } from "./types";
 
 const DIMENSIONS = 1536;
 const DEFAULT_THRESHOLD = 0.72;
@@ -29,8 +29,15 @@ export function createRepository(client: RepositoryClient): Repository {
         return typeof value.source_id === "string" && typeof value.content_hash === "string" ? [[value.source_id, value.content_hash]] : [];
       }));
     },
-    async refreshAtomically(sources) {
-      const payload = sources.map((source) => ({ source_id: source.sourceId, raw_content: source.rawContent, normalized_markdown: source.normalizedMarkdown, content_hash: source.contentHash, chunks: source.chunks.map((chunk) => ({ source_id: chunk.sourceId, content: chunk.content, embedding: chunk.embedding, section: chunk.section ?? null, content_hash: chunk.contentHash ?? null })) }));
+    async refreshAtomically(sources: AtomicRefreshSource[]) {
+      if (!sources.length) throw new Error("Atomic refresh payload must be non-empty");
+      const seen = new Set<string>();
+      for (const source of sources) {
+        if (!source.sourceId || seen.has(source.sourceId) || !source.contentHash || !source.chunks.length) throw new Error("Invalid atomic refresh payload");
+        seen.add(source.sourceId);
+        for (const chunk of source.chunks) assertEmbedding(chunk.embedding);
+      }
+      const payload = sources.map((source) => ({ source_id: source.sourceId, raw_content: source.rawContent, normalized_markdown: source.normalizedMarkdown, content_hash: source.contentHash, chunks: source.chunks.map((chunk) => ({ content: chunk.content, embedding: chunk.embedding, section: chunk.section ?? null, content_hash: chunk.contentHash ?? null })) }));
       const result = await client.rpc("refresh_knowledge_base", { p_sources: payload });
       if (result.error) throw new Error(`Repository atomic refresh failed: ${result.error.message}`);
     },
