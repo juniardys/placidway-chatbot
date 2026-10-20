@@ -23,6 +23,8 @@ export const QUOTE_SUGGESTION = "Please contact PlacidWay for assistance or a fr
 export const APPOINTMENT_RESPONSE = `I cannot book appointments. ${QUOTE_SUGGESTION}`;
 export const OUT_OF_SCOPE_RESPONSE =
   "I can only answer questions about information in the approved PlacidWay content.";
+export const UNSUPPORTED_PREMISE_RESPONSE =
+  "The approved PlacidWay content does not support that price or factual premise. Please contact PlacidWay for a free quote.";
 
 export const CHATBOT_SYSTEM_PROMPT = `You are the PlacidWay knowledge assistant.
 

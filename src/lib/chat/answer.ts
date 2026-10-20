@@ -10,7 +10,9 @@ export async function* streamGroundedAnswer(input: { question: string; evidence:
   const policy = classifyQuestion(input.question);
   if (policy.response) { yield { type: "delta", text: policy.response }; yield { type: "done" }; return; }
   const evidence = input.evidence.filter(validCitation);
-  if (!evidence.length) { yield { type: "delta", text: UNKNOWN_RESPONSE }; yield { type: "done" }; return; }
+  if (!evidence.length || (policy.requireComparisonSides && evidence.length < 2)) {
+    yield { type: "delta", text: UNKNOWN_RESPONSE }; yield { type: "done" }; return;
+  }
   yield { type: "delta", text: evidence.map((chunk) => chunk.content).join("\n\n") };
   yield { type: "citations", citations: evidence };
   yield { type: "done" };
