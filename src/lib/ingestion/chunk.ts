@@ -5,10 +5,11 @@ export function chunkByHeading(markdown: string, maxChars = 1800, metadata: Omit
   const add = (content: string) => { if (content.trim()) chunks.push({ ...metadata, content: content.trim(), section, index: chunks.length }); };
   const flush = () => { add(buffer); buffer = ""; };
   for (const block of markdown.split(/\n\s*\n/)) {
-    const heading = block.match(/^#{1,6}\s+(.+)$/m); if (heading) { flush(); section = heading[1].trim(); }
+    const heading = block.match(/^#{1,6}\s+(.+)$/m);
+    if (heading) { flush(); section = heading[1].trim(); continue; }
     let remaining = block;
-    while (remaining.length > maxChars) { const cut = remaining.slice(0, maxChars); const split = cut.lastIndexOf(" "); const at = split > 0 ? split : maxChars; add(`${buffer}${buffer ? "\n\n" : ""}${remaining.slice(0, at)}`); buffer = ""; remaining = remaining.slice(at).trimStart(); }
-    buffer += `${buffer ? "\n\n" : ""}${remaining}`;
+    while (remaining.length > maxChars) { const at = Math.max(1, remaining.slice(0, maxChars).lastIndexOf(" ")); add(`${section}\n${remaining.slice(0, at)}`.slice(0, maxChars)); remaining = remaining.slice(at).trimStart(); }
+    if (remaining) { const candidate = `${section}\n${remaining}`; if (candidate.length > maxChars) flush(); else buffer = `${buffer ? `${buffer}\n\n` : ""}${candidate}`; }
     if (buffer.length >= maxChars) flush();
   }
   flush(); return chunks;
