@@ -18,7 +18,7 @@ function validEvidence(chunk: RetrievedChunk): boolean {
 }
 
 function comparisonSidesCovered(question: string, evidence: RetrievedChunk[]): boolean {
-  const match = question.match(/(?:compare|versus|vs\\.?|difference between)\\s+(.+?)(?:\\s+and\\s+|\\s+vs\\.?\\s+|\\s+versus\\s+)(.+?)(?:[?.,]|$)/i);
+  const match = question.match(/(?:compare|versus|vs\.?|difference between)\s+(.+?)(?:\s+and\s+|\s+vs\.?\s+|\s+versus\s+)(.+?)(?:[?.,]|$)/i);
   if (!match) return evidence.length >= 2;
   const sides = match.slice(1, 3).map((side) => side.trim().toLowerCase());
   return sides.every((side) => evidence.some((chunk) => chunk.content.toLowerCase().includes(side) || chunk.title.toLowerCase().includes(side) || (chunk.section ?? "").toLowerCase().includes(side)));
