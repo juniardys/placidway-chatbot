@@ -23,24 +23,37 @@ describe("answer policy", () => {
   });
 
   test("cost, package, and follow-up require evidence", () => {
-    for (const question of ["What is the price?", "What is included?", "What about recovery?"]) {
+    for (const question of [
+      "What is the price?",
+      "What is included?",
+      "What about recovery?",
+    ]) {
       expect(classifyQuestion(question).requireEvidence).toBe(true);
     }
   });
 
   test("unsupported premise has explicit controlled response", () => {
-    for (const question of ["Is it really only $50?", "Is it available for $50?"]) {
+    for (const question of [
+      "Is it really only $50?",
+      "Is it available for $50?",
+    ]) {
       expect(classifyQuestion(question).kind).toBe("unsupported-premise");
-      expect(classifyQuestion(question).response).toBe(UNSUPPORTED_PREMISE_RESPONSE);
+      expect(classifyQuestion(question).response).toBe(
+        UNSUPPORTED_PREMISE_RESPONSE,
+      );
     }
   });
 
   test("comparison exposes controlled insufficient-evidence response", () => {
     const decision = classifyQuestion("Compare Turkey and Thailand");
-    expect(decision.insufficientComparisonResponse).toContain("reliable comparison");
+    expect(decision.insufficientComparisonResponse).toContain(
+      "reliable comparison",
+    );
   });
 
   test("ordinary numeric price question remains cost", () => {
-    expect(classifyQuestion("How much does the package cost in USD 2,000?").kind).toBe("cost");
+    expect(
+      classifyQuestion("How much does the package cost in USD 2,000?").kind,
+    ).toBe("cost");
   });
 });

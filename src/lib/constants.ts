@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-const boundedInt = (value: string | undefined, fallback: number, max: number) => {
+const boundedInt = (
+  value: string | undefined,
+  fallback: number,
+  max: number,
+) => {
   const parsed = z.coerce.number().int().min(1).max(max).safeParse(value);
   return parsed.success ? parsed.data : fallback;
 };
@@ -9,9 +13,21 @@ const score = (value: string | undefined, fallback: number) => {
   return parsed.success ? parsed.data : fallback;
 };
 
-export const MAX_HISTORY_MESSAGES = boundedInt(process.env.MAX_HISTORY_MESSAGES, 10, 10);
-export const MAX_HISTORY_CONTENT_LENGTH = boundedInt(process.env.MAX_HISTORY_CONTENT_LENGTH, 4000, 4000);
-export const MAX_QUESTION_LENGTH = boundedInt(process.env.MAX_QUESTION_LENGTH, 1000, 2000);
+export const MAX_HISTORY_MESSAGES = boundedInt(
+  process.env.MAX_HISTORY_MESSAGES,
+  10,
+  10,
+);
+export const MAX_HISTORY_CONTENT_LENGTH = boundedInt(
+  process.env.MAX_HISTORY_CONTENT_LENGTH,
+  4000,
+  4000,
+);
+export const MAX_QUESTION_LENGTH = boundedInt(
+  process.env.MAX_QUESTION_LENGTH,
+  1000,
+  2000,
+);
 export const RETRIEVAL_TOP_K = boundedInt(process.env.RETRIEVAL_TOP_K, 6, 50);
 export const RETRIEVAL_MIN_SCORE = score(process.env.RETRIEVAL_MIN_SCORE, 0.72);
 
@@ -19,7 +35,8 @@ export const UNKNOWN_RESPONSE =
   "I could not find that information in the approved PlacidWay content. Please contact PlacidWay for a free quote.";
 export const MEDICAL_DISCLAIMER =
   "I cannot diagnose, assess your individual safety, or recommend treatment. Please consult a qualified doctor.";
-export const QUOTE_SUGGESTION = "Please contact PlacidWay for assistance or a free quote.";
+export const QUOTE_SUGGESTION =
+  "Please contact PlacidWay for assistance or a free quote.";
 export const APPOINTMENT_RESPONSE = `I cannot book appointments. ${QUOTE_SUGGESTION}`;
 export const OUT_OF_SCOPE_RESPONSE =
   "I can only answer questions about information in the approved PlacidWay content.";

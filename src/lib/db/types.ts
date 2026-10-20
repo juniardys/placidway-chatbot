@@ -39,12 +39,32 @@ export type ChunkInput = {
   contentHash?: string | null;
 };
 
-export type AtomicRefreshChunk = { content: string; embedding: number[]; section?: string | null; contentHash?: string | null };
-export type AtomicRefreshSource = { sourceId: string; rawContent: string; normalizedMarkdown: string; contentHash: string; chunks: AtomicRefreshChunk[] };
-export type RefreshRepository = Pick<Repository, "getActiveHashes" | "refreshAtomically">;
+export type AtomicRefreshChunk = {
+  content: string;
+  embedding: number[];
+  section?: string | null;
+  contentHash?: string | null;
+};
+export type AtomicRefreshSource = {
+  sourceId: string;
+  title: string;
+  url: string;
+  pageType: string;
+  rawContent: string;
+  normalizedMarkdown: string;
+  contentHash: string;
+  chunks: AtomicRefreshChunk[];
+};
+export type RefreshRepository = Pick<
+  Repository,
+  "getActiveHashes" | "refreshAtomically"
+>;
 
 export type Repository = {
-  getActiveChunks(queryEmbedding: number[], limit: number): Promise<RetrievedChunk[]>;
+  getActiveChunks(
+    queryEmbedding: number[],
+    limit: number,
+  ): Promise<RetrievedChunk[]>;
   getActiveHashes(): Promise<Record<string, string>>;
   refreshAtomically(sources: AtomicRefreshSource[]): Promise<void>;
   insertSourceSnapshot(input: SourceSnapshotInput): Promise<string>;
@@ -54,7 +74,11 @@ export type Repository = {
 };
 
 export type RepositoryClient = {
-  rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ 
+  from?: (table: string) => any;
+  rpc: (
+    name: string,
+    args: Record<string, unknown>,
+  ) => PromiseLike<{
     data: unknown[] | null;
     error: { message: string } | null;
   }>;

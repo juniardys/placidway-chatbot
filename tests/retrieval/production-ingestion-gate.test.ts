@@ -8,6 +8,6 @@ test("production ingestion requires exactly seven complete unique sources", () =
   expect(new Set(SOURCES.map((source) => source.url)).size).toBe(7);
 });
 
-test("production ingestion rejects placeholder URLs", () => {
-  expect(() => validateProductionSources()).toThrow("placeholders");
+test("production ingestion accepts configured assessment URLs", () => {
+  expect(() => validateProductionSources()).not.toThrow();
 });

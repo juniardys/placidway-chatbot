@@ -35,12 +35,14 @@
 ### Task 1: Lock repository contracts with failing tests
 
 **Files:**
+
 - Modify: `src/lib/db/types.ts`
 - Modify: `src/lib/db/repositories.ts`
 - Create: `tests/db/repositories.test.ts`
 - Create: `tests/retrieval/retrieve.test.ts`
 
 **Interfaces:**
+
 - `RetrievedChunk`: `{ id: string; content: string; sourceId: string; title: string; url: string; pageType: string; section: string | null; fetchedAt: string; contentHash: string; similarity: number }`.
 - `Repository`: `getActiveChunks(queryEmbedding: number[], limit: number): Promise<RetrievedChunk[]>`.
 - `Repository`: `insertSourceSnapshot(input): Promise<string>` and `activateSnapshot(snapshotId: string): Promise<void>`.
@@ -60,10 +62,12 @@ Expected: FAIL because repository and retrieval contracts are incomplete.
 ### Task 2: Add Supabase pgvector migration and active-search RPC
 
 **Files:**
+
 - Create or modify: `supabase/migrations/001_knowledge_base.sql`
 - Create: `tests/db/migration-contract.test.ts`
 
 **Interfaces:**
+
 - SQL function: `match_knowledge_chunks(query_embedding vector(1536), match_threshold real, match_count integer)`.
 - RPC result columns: `id`, `content`, `source_id`, `title`, `url`, `page_type`, `section`, `fetched_at`, `content_hash`, `similarity`.
 
@@ -83,12 +87,14 @@ Expected: PASS.
 ### Task 3: Implement server-side Supabase client and repository
 
 **Files:**
+
 - Create: `src/lib/db/client.ts`
 - Modify: `src/lib/db/types.ts`
 - Modify: `src/lib/db/repositories.ts`
 - Modify: `tests/db/repositories.test.ts`
 
 **Interfaces:**
+
 - `getServerSupabase(): SupabaseClient` using server-only environment values.
 - `createRepository(client = getServerSupabase()): Repository`.
 - `getActiveChunks(queryEmbedding, limit)` calls `client.rpc('match_knowledge_chunks', { query_embedding, match_threshold, match_count })`.
@@ -109,12 +115,14 @@ Expected: PASS.
 ### Task 4: Implement grounded embedding retrieval
 
 **Files:**
+
 - Modify: `src/lib/retrieval/retrieve.ts`
 - Modify: `src/lib/llm/embeddings.ts` if needed
 - Modify: `tests/retrieval/retrieve.test.ts`
 - Create: `tests/retrieval/production-ingestion-gate.test.ts`
 
 **Interfaces:**
+
 - `retrieveEvidence(question: string, history: ChatMessage[]): Promise<RetrievedChunk[]>`.
 - Query text combines bounded question/history only for embedding; history cannot override evidence.
 - Retrieval calls embeddings with configured `EMBEDDING_MODEL` and `1536` dimensions, then repository `getActiveChunks`.
@@ -134,12 +142,14 @@ Expected: PASS.
 ### Task 5: Connect grounded retrieval to answer flow and verify
 
 **Files:**
+
 - Modify: `src/lib/chat/answer.ts`
 - Modify: `src/lib/policy/answer-policy.ts`
 - Modify: `src/app/api/chat/route.ts` only where needed
 - Create or modify: `tests/api/chat-grounding.test.ts`
 
 **Interfaces:**
+
 - Empty/insufficient evidence produces controlled unknown response and free-quote suggestion without calling the LLM.
 - Factual generated answers receive only validated evidence and citations generated from repository metadata.
 - Provider failures emit safe SSE error events and never expose keys, prompts, stack traces, or raw provider errors.
@@ -160,6 +170,7 @@ Expected: PASS.
 ### Task 6: Full verification and documentation update
 
 **Files:**
+
 - Modify: `README.md`
 - Modify: `docs/implementation-progress.md`
 
@@ -168,6 +179,7 @@ Expected: PASS.
 - [ ] **Step 3: Run full verification.**
 
 Run:
+
 ```bash
 bun test
 bun run lint

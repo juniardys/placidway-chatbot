@@ -45,12 +45,14 @@
 ### Task 1: Next.js scaffold and runtime configuration
 
 **Files:**
+
 - Create: `package.json`, `tsconfig.json`, `next.config.ts`, `postcss.config.mjs`, `eslint.config.mjs`
 - Create: `src/app/layout.tsx`, `src/app/page.tsx`, `src/app/globals.css`
 - Create: `.env.example`, `.gitignore`, `README.md`
 - Test: `tests/config/env.test.ts`
 
 **Interfaces:**
+
 - Produces a runnable Next.js App Router project and validated server environment configuration.
 - Exposes `getServerEnv(): ServerEnv` for server-only modules.
 
@@ -63,11 +65,13 @@
 ### Task 2: Database migration and repository boundary
 
 **Files:**
+
 - Create: `supabase/migrations/001_knowledge_base.sql`
 - Create: `src/lib/db/client.ts`, `src/lib/db/repositories.ts`, `src/lib/db/types.ts`
 - Test: `tests/db/repositories.test.ts`
 
 **Interfaces:**
+
 - Produces `getActiveChunks(queryEmbedding, limit): Promise<RetrievedChunk[]>`.
 - Produces source/snapshot/chunk write and activation methods used by ingestion.
 - Produces `logChatOutcome(input): Promise<void>`.
@@ -81,12 +85,14 @@
 ### Task 3: LangChain provider and node-cron scheduler
 
 **Files:**
+
 - Create: `src/lib/llm/client.ts`, `src/lib/llm/embeddings.ts`
 - Create: `src/lib/ingestion/cron.ts`, `src/instrumentation.ts`
 - Modify: `package.json`
 - Test: `tests/llm/provider-config.test.ts`, `tests/ingestion/cron.test.ts`
 
 **Interfaces:**
+
 - Produces `getChatModel(): ChatOpenAI` configured with custom `baseURL`.
 - Produces `getEmbeddings(): OpenAIEmbeddings` configured with custom `baseURL`, model, and dimension `1536`.
 - Produces `startIngestionCron(refresh: () => Promise<void>): ScheduledTask`.
@@ -101,11 +107,13 @@
 ### Task 4: Source allowlist, robots, fetch, and normalization
 
 **Files:**
+
 - Create: `src/lib/ingestion/sources.ts`, `src/lib/ingestion/fetcher.ts`, `src/lib/ingestion/normalize.ts`
 - Create: `src/config/sources.ts`
 - Test: `tests/ingestion/sources.test.ts`, `tests/ingestion/normalize.test.ts`
 
 **Interfaces:**
+
 - Produces `assertAllowedSource(url): AllowedSource`.
 - Produces `fetchSource(source): Promise<RawSnapshot>`.
 - Produces `normalizeSource(raw): NormalizedDocument`.
@@ -119,11 +127,13 @@
 ### Task 5: Refresh service and snapshot activation
 
 **Files:**
+
 - Create: `src/lib/ingestion/refresh.ts`, `src/lib/ingestion/chunk.ts`
 - Create: `src/app/api/admin/refresh/route.ts`
 - Test: `tests/ingestion/refresh.test.ts`, `tests/api/admin-refresh.test.ts`
 
 **Interfaces:**
+
 - Produces `refreshKnowledgeBase(): Promise<RefreshResult>`.
 - Manual route accepts `POST` with `Authorization: Bearer <REFRESH_SECRET>` and returns JSON status.
 
@@ -138,11 +148,13 @@
 ### Task 6: Retrieval, policy, grounded answer generation, and SSE API
 
 **Files:**
+
 - Create: `src/lib/retrieval/retrieve.ts`, `src/lib/policy/answer-policy.ts`, `src/lib/chat/answer.ts`
 - Create: `src/app/api/chat/route.ts`
 - Test: `tests/api/chat.test.ts`, `tests/policy/answer-policy.test.ts`
 
 **Interfaces:**
+
 - Produces `retrieveEvidence(question, history): Promise<RetrievedChunk[]>`.
 - Produces `classifyQuestion(question): PolicyDecision`.
 - Produces `streamGroundedAnswer(input): AsyncIterable<ChatEvent>`.
@@ -159,11 +171,13 @@
 ### Task 7: Public chat UI and end-to-end behavior
 
 **Files:**
+
 - Modify: `src/app/page.tsx`, `src/app/globals.css`
 - Create: `src/components/chat/chat-shell.tsx`, `src/components/chat/message-list.tsx`, `src/components/chat/message-composer.tsx`, `src/components/chat/citation-list.tsx`
 - Test: `tests/e2e/chat.spec.ts`
 
 **Interfaces:**
+
 - UI consumes `/api/chat` SSE contract from Task 6.
 - UI displays messages, streaming state, error state, retry, and citation links.
 
@@ -176,11 +190,13 @@
 ### Task 8: Documentation and acceptance suite
 
 **Files:**
+
 - Modify: `README.md`
 - Create: `tests/acceptance/assessment-questions.md`, `docs/acceptance/answers.md`
 - Test: full test suite and production build
 
 **Interfaces:**
+
 - Documents local setup, env vars, migrations, seven source configuration, cron operation, manual refresh, SSE contract, deployment runtime requirement, limitations, provider selection, and all locked decisions in `docs/IMPLEMENTATION-NOTES.md`.
 
 - [ ] **Step 1: Add repeatable eight-category assessment questions and answer recording template.**

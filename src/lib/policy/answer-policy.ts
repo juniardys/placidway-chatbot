@@ -34,7 +34,10 @@ export function classifyQuestion(question: string): PolicyDecision {
   const s = question.trim().toLowerCase();
 
   if (
-    has(s, /diagnos|safe for me|is it safe|should i take|am i a candidate|recommend.*treatment|what treatment.*for me/) 
+    has(
+      s,
+      /diagnos|safe for me|is it safe|should i take|am i a candidate|recommend.*treatment|what treatment.*for me/,
+    )
   ) {
     return {
       kind: "medical",
@@ -43,23 +46,48 @@ export function classifyQuestion(question: string): PolicyDecision {
     };
   }
 
-  if (has(s, /book|appointment|schedule|reserve|availability.*clinic|available.*appointment/)) {
+  if (
+    has(
+      s,
+      /book|appointment|schedule|reserve|availability.*clinic|available.*appointment/,
+    )
+  ) {
     return { kind: "appointment", response: APPOINTMENT_RESPONSE };
   }
 
-  if (has(s, /weather|stock price|politic|recipe|sports score|joke|write.*code|latest news/)) {
+  if (
+    has(
+      s,
+      /weather|stock price|politic|recipe|sports score|joke|write.*code|latest news/,
+    )
+  ) {
     return { kind: "out-of-scope", response: OUT_OF_SCOPE_RESPONSE };
   }
 
   // A stated amount is not evidence of the actual price. Refuse premise instead of guessing.
   if (
-    has(s, /does .* cost|is .* \$\s*\d|is .*\b\d[\d,]*(?:\.\d+)?\s*(?:usd|dollars?|€|eur|£|gbp)\b/) &&
-    has(s, /really|จริง|จริงไหม|listed|advertised|only|just|available|available for|เชื่อม/) 
+    has(
+      s,
+      /does .* cost|is .* \$\s*\d|is .*\b\d[\d,]*(?:\.\d+)?\s*(?:usd|dollars?|€|eur|£|gbp)\b/,
+    ) &&
+    has(
+      s,
+      /really|จริง|จริงไหม|listed|advertised|only|just|available|available for|เชื่อม/,
+    )
   ) {
-    return { kind: "unsupported-premise", requireEvidence: true, response: UNSUPPORTED_PREMISE_RESPONSE };
+    return {
+      kind: "unsupported-premise",
+      requireEvidence: true,
+      response: UNSUPPORTED_PREMISE_RESPONSE,
+    };
   }
 
-  if (has(s, /compare|comparison|versus|\bvs\.?\b|difference between|which is (?:cheaper|better)/)) {
+  if (
+    has(
+      s,
+      /compare|comparison|versus|\bvs\.?\b|difference between|which is (?:cheaper|better)/,
+    )
+  ) {
     return {
       kind: "comparison",
       requireEvidence: true,
@@ -72,12 +100,20 @@ export function classifyQuestion(question: string): PolicyDecision {
     return { kind: "cost", requireEvidence: true };
   }
 
-  if (has(s, /package|what(?:'s| is) included|includes|inclusions|procedure|treatment.*include/)) {
+  if (
+    has(
+      s,
+      /package|what(?:'s| is) included|includes|inclusions|procedure|treatment.*include/,
+    )
+  ) {
     return { kind: "package", requireEvidence: true };
   }
 
   if (
-    has(s, /\b(it|that|this|they|there)\b|what about|how long|recovery|after (?:that|the procedure)|and what/) &&
+    has(
+      s,
+      /\b(it|that|this|they|there)\b|what about|how long|recovery|after (?:that|the procedure)|and what/,
+    ) &&
     has(s, /\b(about|after|then|also|that|this|it|they|there)\b|\?$/)
   ) {
     return { kind: "follow-up", requireEvidence: true };

@@ -22,6 +22,10 @@ export function getEmbeddings(): OpenAIEmbeddings {
     dimensions: env.EMBEDDING_DIMENSIONS,
     configuration: { baseURL: endpoint() },
   });
-  Object.defineProperty(embeddings, "model", { value: env.EMBEDDING_MODEL || "sumo/text-embedding-3-small", writable: true, configurable: true });
+  Object.defineProperty(embeddings, "model", {
+    value: env.EMBEDDING_MODEL || "sumo/text-embedding-3-small",
+    writable: true,
+    configurable: true,
+  });
   return embeddings;
 }
