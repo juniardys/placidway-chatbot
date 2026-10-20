@@ -10,8 +10,8 @@ export type SourceMetadata = {
 
 export type RetrievedChunk = SourceMetadata & {
   id: string;
-  text: string;
-  score: number;
+  content: string;
+  similarity: number;
   active?: boolean;
 };
 

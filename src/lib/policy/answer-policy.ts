@@ -24,5 +24,4 @@ export function classifyQuestion(q: string): PolicyDecision {
     };
   return { kind: "answer" };
 }
-export const UNKNOWN_RESPONSE =
-  "I could not find that information in the approved PlacidWay content. Please contact PlacidWay for a free quote.";
+export { UNKNOWN_RESPONSE } from "../constants";

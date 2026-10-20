@@ -9,10 +9,10 @@ function mapChunk(row: RawChunk): RetrievedChunk | null {
   const sourceId = typeof row.source_id === "string" ? row.source_id : null;
   const title = typeof row.title === "string" ? row.title : null;
   const url = typeof row.url === "string" ? row.url : null;
-  const text = typeof row.content === "string" ? row.content : typeof row.text_content === "string" ? row.text_content : null;
-  const score = typeof row.similarity === "number" && Number.isFinite(row.similarity) ? row.similarity : null;
-  if (!id || !sourceId || !title || !url || !text || score === null) return null;
-  return { id, text, sourceId, title, url, pageType: typeof row.page_type === "string" ? row.page_type : undefined, section: typeof row.section === "string" ? row.section : undefined, fetchedAt: typeof row.fetched_at === "string" ? row.fetched_at : undefined, contentHash: typeof row.content_hash === "string" ? row.content_hash : undefined, score };
+  const content = typeof row.content === "string" ? row.content : null;
+  const similarity = typeof row.similarity === "number" && Number.isFinite(row.similarity) ? row.similarity : null;
+  if (!id || !sourceId || !title || !url || !content || similarity === null) return null;
+  return { id, content, sourceId, title, url, pageType: typeof row.page_type === "string" ? row.page_type : undefined, section: typeof row.section === "string" ? row.section : undefined, fetchedAt: typeof row.fetched_at === "string" ? row.fetched_at : undefined, contentHash: typeof row.content_hash === "string" ? row.content_hash : undefined, similarity };
 }
 
 export function createRepository(client: RepositoryClient) {

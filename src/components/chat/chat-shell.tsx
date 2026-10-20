@@ -64,7 +64,6 @@ export function ChatShell() {
         <header className="topbar">
           <div className="brand-mark" aria-hidden="true"><span>+</span></div>
           <div><p className="brand-name">PlacidWay</p><p className="brand-subtitle">Care, made clearer</p></div>
-          <div className="status-pill"><span /> Knowledge assistant</div>
         </header>
 
         <section className="conversation" aria-live="polite" aria-label="Conversation">

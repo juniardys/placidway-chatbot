@@ -12,7 +12,7 @@ describe("grounded answer", () => {
 
   test("emits only validated citation metadata", async () => {
     const events = [];
-    for await (const event of streamGroundedAnswer({ question: "price?", evidence: [{ id: "1", text: "Price", sourceId: "s", title: "Source", url: "https://example.com", score: 0.9 }, { id: "2", text: "bad", sourceId: "", title: "", url: "bad", score: 0.9 }] })) events.push(event);
+    for await (const event of streamGroundedAnswer({ question: "price?", evidence: [{ id: "1", content: "Price", sourceId: "s", title: "Source", url: "https://example.com", similarity: 0.9 }, { id: "2", content: "bad", sourceId: "", title: "", url: "bad", similarity: 0.9 }] })) events.push(event);
     const citation = events.find((event) => event.type === "citations");
     expect(citation).toMatchObject({ citations: [{ id: "1" }] });
   });

@@ -6,9 +6,9 @@ describe("retrieveEvidence", () => {
     const result = await retrieveEvidence("price", [], {
       embed: async () => Array(1536).fill(0),
       retrieve: async () => [
-        { id: "good", text: "yes", sourceId: "s", title: "T", url: "https://x.test", score: 0.8 },
-        { id: "low", text: "no", sourceId: "s", title: "T", url: "https://x.test", score: 0.2 },
-        { id: "bad", text: "no", sourceId: "s", title: "T", url: "not-url", score: 0.9 },
+        { id: "good", content: "yes", sourceId: "s", title: "T", url: "https://x.test", similarity: 0.8 },
+        { id: "low", content: "no", sourceId: "s", title: "T", url: "https://x.test", similarity: 0.2 },
+        { id: "bad", content: "no", sourceId: "s", title: "T", url: "not-url", similarity: 0.9 },
       ],
     });
     expect(result.map((x) => x.id)).toEqual(["good"]);
