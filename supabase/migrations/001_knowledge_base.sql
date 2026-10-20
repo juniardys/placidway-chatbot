@@ -87,6 +87,30 @@ as $$
   limit greatest(match_count, 0);
 $$;
 
+create or replace function insert_source_snapshot(p_id uuid, p_source_id text, p_raw_content text, p_normalized_markdown text, p_content_hash text, p_status text default 'pending')
+returns table(id uuid) language sql security definer as $$
+  insert into knowledge_snapshots(id, source_id, raw_content, normalized_markdown, content_hash, status)
+  values (coalesce(p_id, gen_random_uuid()), p_source_id, p_raw_content, p_normalized_markdown, p_content_hash, p_status)
+  returning knowledge_snapshots.id;
+$$;
+
+create or replace function insert_knowledge_chunks(p_chunks jsonb)
+returns void language plpgsql security definer as $$
+begin
+  insert into knowledge_chunks(source_id, snapshot_id, text_content, embedding, section, content_hash)
+  select x.source_id, x.snapshot_id, x.text_content, x.embedding::vector, x.section, x.content_hash
+  from jsonb_to_recordset(p_chunks) as x(source_id text, snapshot_id uuid, text_content text, embedding jsonb, section text, content_hash text);
+end;
+$$;
+
+create or replace function activate_snapshot(p_snapshot_id uuid)
+returns void language sql security definer as $$
+  update knowledge_snapshots set active = (id = p_snapshot_id), status = case when id = p_snapshot_id then 'active' else status end
+  where source_id = (select source_id from knowledge_snapshots where id = p_snapshot_id);
+  update knowledge_chunks set active = (snapshot_id = p_snapshot_id)
+  where source_id = (select source_id from knowledge_snapshots where id = p_snapshot_id);
+$$;
+
 create or replace function log_chat_outcome(p_question text, p_status text, p_confidence numeric default null)
 returns void language sql security definer as $$
   insert into chat_logs(question, answer_status, confidence)
