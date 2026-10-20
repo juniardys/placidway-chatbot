@@ -1,35 +1,25 @@
 export type RawSnapshot = { html: string; url: string; fetchedAt?: string };
-export type NormalizedDocument = {
-  markdown: string;
-  title: string;
-  sections: string[];
-  url: string;
-  contentHash: string;
-};
-export async function normalizeSource(
-  raw: RawSnapshot,
-): Promise<NormalizedDocument> {
-  const title =
-    raw.html.match(/<title[^>]*>(.*?)<\/title>/is)?.[1]?.trim() ?? raw.url;
-  const markdown = raw.html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const hash = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(markdown),
-  );
-  return {
-    markdown,
-    title,
-    sections: markdown.split(
-      /(?=\b(?:price|package|procedure|recovery|clinic|disclaimer)\b)/i,
-    ),
-    url: raw.url,
-    contentHash: [...new Uint8Array(hash)]
-      .map((x) => x.toString(16).padStart(2, "0"))
-      .join(""),
-  };
+export type NormalizedDocument = { markdown: string; title: string; sections: string[]; url: string; contentHash: string };
+
+function htmlToMarkdown(html: string): { title: string; markdown: string } {
+  const title = html.match(/<title[^>]*>(.*?)<\/title>/is)?.[1]?.trim() ?? "";
+  const markdown = html
+    .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<nav[\s\S]*?<\/nav>/gi, "")
+    .replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi, (_, level, text) => `\n${"#".repeat(Number(level))} ${text.replace(/<[^>]+>/g, "").trim()}\n`)
+    .replace(/<br\s*\/?>(?=.)/gi, "\n")
+    .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, "\n$1\n")
+    .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "\n- $1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n\n").trim();
+  return { title: title || markdown.match(/^#\s+(.+)$/m)?.[1] || "Untitled", markdown };
+}
+
+export async function normalizeSource(raw: RawSnapshot): Promise<NormalizedDocument> {
+  const { title, markdown } = htmlToMarkdown(raw.html);
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(markdown));
+  const sections: string[] = [];
+  let heading = title;
+  for (const block of markdown.split(/\n\s*\n/)) { const h = block.match(/^(#{1,6})\s+(.+)$/m); if (h) heading = h[2].trim(); if (block.trim()) sections.push(`${heading}\n${block.trim()}`); }
+  return { markdown, title, sections, url: raw.url, contentHash: [...new Uint8Array(hash)].map((x) => x.toString(16).padStart(2, "0")).join("") };
 }
