@@ -16,10 +16,12 @@ export function getChatModel(): ChatOpenAI {
 
 export function getEmbeddings(): OpenAIEmbeddings {
   const env = getServerEnv();
-  return new OpenAIEmbeddings({
+  const embeddings = new OpenAIEmbeddings({
     apiKey: env.LLM_API_KEY,
-    model: env.EMBEDDING_MODEL,
-    dimensions: 1536,
+    model: env.EMBEDDING_MODEL || "sumo/text-embedding-3-small",
+    dimensions: env.EMBEDDING_DIMENSIONS,
     configuration: { baseURL: endpoint() },
   });
+  (embeddings as unknown as { model?: string }).model = env.EMBEDDING_MODEL || "sumo/text-embedding-3-small";
+  return embeddings;
 }
