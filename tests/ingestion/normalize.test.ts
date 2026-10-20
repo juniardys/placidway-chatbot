@@ -1,0 +1,3 @@
+import { expect, test } from "vitest";
+import { normalizeSource } from "../../src/lib/ingestion/normalize";
+test("normalizes headings, removes navigation, hashes, retains metadata", async () => { const doc = await normalizeSource({ html: "<title> T </title><nav>bad</nav><h1>Clinic</h1><p>Hello &amp; welcome</p>", url: "https://x", fetchedAt: "now", status: 200, headers: { x: "y" }, sourceId: "id", title: "T", pageType: "content" }); expect(doc.markdown).toContain("# Clinic"); expect(doc.markdown).not.toContain("bad"); expect(doc.contentHash).toHaveLength(64); expect(doc.sourceId).toBe("id"); expect(doc.sections[0]).toContain("Clinic"); });
