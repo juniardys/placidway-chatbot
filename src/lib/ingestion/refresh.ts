@@ -18,7 +18,14 @@ export async function refreshKnowledgeBase(deps: RefreshDeps = {}): Promise<Refr
   if (useGlobalLock) running = true;
   let sources = 0; let chunks = 0;
   try {
-    const list = deps.sources ?? SOURCES; if (list === SOURCES) validateProductionSources(list); else validateSourceFixture(list); const fetcher = deps.fetch ?? fetchSource; const normalizer = deps.normalize ?? normalizeSource; const chunker = deps.chunk ?? chunkByHeading; const repository = deps.repository ?? createRepository(getServerSupabase()); const embedding = deps.embeddings ?? getEmbeddings(); const activeHashes = await repository.getActiveHashes();
+    const list = deps.sources ?? SOURCES;
+    if (list === SOURCES) validateProductionSources(list); else validateSourceFixture(list);
+    const fetcher = deps.fetch ?? fetchSource;
+    const normalizer = deps.normalize ?? normalizeSource;
+    const chunker = deps.chunk ?? chunkByHeading;
+    const repository = deps.repository ?? createRepository(getServerSupabase());
+    const embedding = deps.embeddings ?? getEmbeddings();
+    const activeHashes = await repository.getActiveHashes();
     const documents: { doc: NormalizedDocument; parts: DocumentChunk[] }[] = [];
     for (const source of list) { const raw = await fetcher(source, fetch, deps.pacer); const doc = await normalizer(raw); sources++; if (activeHashes[source.id] === doc.contentHash) continue; documents.push({ doc, parts: chunker(doc.markdown, 1800, { sourceId: doc.sourceId, title: doc.title, pageType: doc.pageType, fetchedAt: doc.fetchedAt, contentHash: doc.contentHash }) }); }
     if (!documents.length) return { status: "unchanged", sources, chunks: 0 };

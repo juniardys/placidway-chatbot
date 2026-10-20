@@ -1,8 +1,8 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
-
-const refresh = vi.fn();
-vi.mock("../../src/lib/ingestion/refresh", () => ({ refreshKnowledgeBase: refresh }));
+import * as refreshModule from "../../src/lib/ingestion/refresh";
 import { POST } from "../../src/app/api/admin/refresh/route";
+
+const refresh = vi.spyOn(refreshModule, "refreshKnowledgeBase");
 
 describe("POST /api/admin/refresh", () => {
   beforeEach(() => { process.env.REFRESH_SECRET = "test-secret"; refresh.mockReset(); });
