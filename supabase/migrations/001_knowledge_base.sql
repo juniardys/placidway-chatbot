@@ -79,7 +79,11 @@ as $$
   from knowledge_chunks c
   join knowledge_sources s on s.id = c.source_id
   join knowledge_snapshots sn on sn.id = c.snapshot_id
-  where c.active = true
+  where query_embedding is not null
+    and match_threshold is not null and match_threshold > 0 and match_threshold <= 1
+    and match_count is not null and match_count > 0
+    and s.active = true
+    and c.active = true
     and sn.status = 'active'
     and sn.active = true
     and (1 - (c.embedding <=> query_embedding)) >= match_threshold
@@ -88,15 +92,25 @@ as $$
 $$;
 
 create or replace function insert_source_snapshot(p_id uuid, p_source_id text, p_raw_content text, p_normalized_markdown text, p_content_hash text, p_status text default 'pending')
-returns table(id uuid) language sql security definer set search_path = public, pg_temp as $$
-  insert into knowledge_snapshots(id, source_id, raw_content, normalized_markdown, content_hash, status)
-  values (coalesce(p_id, gen_random_uuid()), p_source_id, p_raw_content, p_normalized_markdown, p_content_hash, p_status)
-  returning knowledge_snapshots.id;
+returns table(id uuid) language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if p_status not in ('pending', 'active', 'failed') then raise exception 'Invalid snapshot status'; end if;
+  return query
+    insert into knowledge_snapshots(id, source_id, raw_content, normalized_markdown, content_hash, status)
+    values (coalesce(p_id, gen_random_uuid()), p_source_id, p_raw_content, p_normalized_markdown, p_content_hash, p_status)
+    returning knowledge_snapshots.id;
+end;
 $$;
 
 create or replace function insert_knowledge_chunks(p_chunks jsonb)
-returns void language plpgsql security definer as $$
+returns void language plpgsql security definer set search_path = public, pg_temp as $$
 begin
+  if p_chunks is null or jsonb_typeof(p_chunks) <> 'array' or jsonb_array_length(p_chunks) = 0 then
+    raise exception 'Chunk payload must be non-empty array';
+  end if;
+  if exists (select 1 from jsonb_array_elements(p_chunks) x where jsonb_typeof(x->'embedding') <> 'array' or jsonb_array_length(x->'embedding') <> 1536) then
+    raise exception 'Each chunk embedding must contain 1536 dimensions';
+  end if;
   insert into knowledge_chunks(source_id, snapshot_id, text_content, embedding, section, content_hash)
   select x.source_id, x.snapshot_id, x.text_content, x.embedding::vector, x.section, x.content_hash
   from jsonb_to_recordset(p_chunks) as x(source_id text, snapshot_id uuid, text_content text, embedding jsonb, section text, content_hash text);
@@ -104,11 +118,14 @@ end;
 $$;
 
 create or replace function activate_snapshot(p_snapshot_id uuid)
-returns void language sql security definer set search_path = public, pg_temp as $$
+returns void language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if not exists (select 1 from knowledge_snapshots where id = p_snapshot_id) then raise exception 'Snapshot not found'; end if;
   update knowledge_snapshots set active = (id = p_snapshot_id), status = case when id = p_snapshot_id then 'active' else status end
   where source_id = (select source_id from knowledge_snapshots where id = p_snapshot_id);
   update knowledge_chunks set active = (snapshot_id = p_snapshot_id)
   where source_id = (select source_id from knowledge_snapshots where id = p_snapshot_id);
+end;
 $$;
 
 create or replace function log_chat_outcome(p_question text, p_status text, p_confidence numeric default null)

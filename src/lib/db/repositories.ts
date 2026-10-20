@@ -22,7 +22,7 @@ function mapChunk(row: RawChunk): RetrievedChunk | null {
 export function createRepository(client: RepositoryClient): Repository {
   return {
     async getActiveChunks(queryEmbedding: number[], limit: number): Promise<RetrievedChunk[]> {
-      if (queryEmbedding.length !== DIMENSIONS) throw new Error("Embedding must contain 1536 dimensions");
+      assertEmbedding(queryEmbedding);
       if (!Number.isInteger(limit) || limit <= 0) throw new Error("Limit must be positive");
       const { data, error } = await client.rpc("match_knowledge_chunks", { query_embedding: queryEmbedding, match_threshold: DEFAULT_THRESHOLD, match_count: limit });
       if (error) throw new Error(`Repository retrieval failed: ${error.message}`);

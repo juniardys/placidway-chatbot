@@ -19,4 +19,19 @@ describe("repository", () => {
     const client = { rpc: async () => ({ data: [], error: null }) };
     await expect(createRepository(client).getActiveChunks([1], 6)).rejects.toThrow("1536");
   });
+
+  test("rejects non-finite retrieval embeddings and non-positive limits", async () => {
+    const client = { rpc: async () => ({ data: [], error: null }) };
+    await expect(createRepository(client).getActiveChunks([...(Array(1535).fill(0)), Number.NaN], 6)).rejects.toThrow("finite");
+    await expect(createRepository(client).getActiveChunks(Array(1536).fill(0), 0)).rejects.toThrow("positive");
+  });
+
+  test("validates write payloads before RPC", async () => {
+    const calls: unknown[] = [];
+    const client = { rpc: async (name: string, args: unknown) => { calls.push([name, args]); return { data: [{ id: "s1" }], error: null }; } };
+    const repository = createRepository(client);
+    await expect(repository.insertChunks({ sourceId: "s", snapshotId: "x", content: "c", embedding: [Number.POSITIVE_INFINITY] })).rejects.toThrow("finite");
+    await expect(repository.activateSnapshot("missing")).resolves.toBeUndefined();
+    expect(calls).toEqual([["activate_snapshot", { p_snapshot_id: "missing" }]]);
+  });
 });
