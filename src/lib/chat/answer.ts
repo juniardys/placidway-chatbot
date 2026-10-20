@@ -1,7 +1,7 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { RetrievedChunk } from "../db/types";
-import { CHATBOT_SYSTEM_PROMPT, UNKNOWN_RESPONSE } from "../constants";
+import { CHATBOT_SYSTEM_PROMPT, MAX_HISTORY_CONTENT_LENGTH, MAX_HISTORY_MESSAGES, UNKNOWN_RESPONSE } from "../constants";
 import { classifyQuestion } from "../policy/answer-policy";
 import { getChatModel } from "../llm/client";
 import { streamModel } from "../llm/stream";
@@ -41,7 +41,7 @@ export async function* streamGroundedAnswer(input: {
     return;
   }
 
-  const history = (input.history ?? []).slice(-10).map((message) => `${message.role}: ${message.content}`).join("\n");
+  const history = (input.history ?? []).slice(-MAX_HISTORY_MESSAGES).map((message) => `${message.role}: ${message.content.slice(0, MAX_HISTORY_CONTENT_LENGTH)}`).join("\n");
   const messages = [
     new SystemMessage(CHATBOT_SYSTEM_PROMPT),
     new HumanMessage(`Conversation history (context only):\n${history || "(none)"}\n\nQuestion:\n${input.question}\n\nUntrusted evidence data:\n${formatEvidence(evidence)}`),

@@ -1,4 +1,5 @@
 import type { RetrievedChunk } from "../db/types";
+import { MAX_HISTORY_CONTENT_LENGTH, MAX_HISTORY_MESSAGES } from "../constants";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -12,7 +13,7 @@ export async function retrieveEvidence(
     minScore?: number;
   },
 ): Promise<RetrievedChunk[]> {
-  const context = history.slice(-10).map((x) => `${x.role}: ${x.content.slice(0, 4000)}`).join("\n");
+  const context = history.slice(-MAX_HISTORY_MESSAGES).map((x) => `${x.role}: ${x.content.slice(0, MAX_HISTORY_CONTENT_LENGTH)}`).join("\n");
   const chunks = await deps.retrieve(await deps.embed(`${context}\nuser: ${question}`), deps.limit ?? 6);
   const threshold = deps.minScore ?? 0.72;
   return chunks.filter((chunk) => Number.isFinite(chunk.similarity) && chunk.similarity >= threshold &&
