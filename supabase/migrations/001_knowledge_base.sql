@@ -13,7 +13,7 @@ create table if not exists knowledge_sources (
 
 create table if not exists knowledge_snapshots (
   id uuid primary key default gen_random_uuid(),
-  source_id text references knowledge_sources(id),
+  source_id text not null references knowledge_sources(id),
   raw_content text not null,
   normalized_markdown text not null,
   content_hash text not null,
@@ -25,8 +25,8 @@ create table if not exists knowledge_snapshots (
 
 create table if not exists knowledge_chunks (
   id uuid primary key default gen_random_uuid(),
-  source_id text references knowledge_sources(id),
-  snapshot_id uuid references knowledge_snapshots(id),
+  source_id text not null references knowledge_sources(id),
+  snapshot_id uuid not null references knowledge_snapshots(id),
   text_content text not null,
   embedding vector(1536),
   section text,
@@ -88,7 +88,7 @@ as $$
 $$;
 
 create or replace function insert_source_snapshot(p_id uuid, p_source_id text, p_raw_content text, p_normalized_markdown text, p_content_hash text, p_status text default 'pending')
-returns table(id uuid) language sql security definer as $$
+returns table(id uuid) language sql security definer set search_path = public, pg_temp as $$
   insert into knowledge_snapshots(id, source_id, raw_content, normalized_markdown, content_hash, status)
   values (coalesce(p_id, gen_random_uuid()), p_source_id, p_raw_content, p_normalized_markdown, p_content_hash, p_status)
   returning knowledge_snapshots.id;
@@ -104,7 +104,7 @@ end;
 $$;
 
 create or replace function activate_snapshot(p_snapshot_id uuid)
-returns void language sql security definer as $$
+returns void language sql security definer set search_path = public, pg_temp as $$
   update knowledge_snapshots set active = (id = p_snapshot_id), status = case when id = p_snapshot_id then 'active' else status end
   where source_id = (select source_id from knowledge_snapshots where id = p_snapshot_id);
   update knowledge_chunks set active = (snapshot_id = p_snapshot_id)
@@ -112,7 +112,18 @@ returns void language sql security definer as $$
 $$;
 
 create or replace function log_chat_outcome(p_question text, p_status text, p_confidence numeric default null)
-returns void language sql security definer as $$
+returns void language sql security definer set search_path = public, pg_temp as $$
   insert into chat_logs(question, answer_status, confidence)
   values (p_question, p_status, p_confidence);
 $$;
+
+revoke all on function match_knowledge_chunks(vector, real, integer) from public, anon, authenticated;
+grant execute on function match_knowledge_chunks(vector, real, integer) to service_role;
+revoke all on function insert_source_snapshot(uuid, text, text, text, text, text) from public, anon, authenticated;
+grant execute on function insert_source_snapshot(uuid, text, text, text, text, text) to service_role;
+revoke all on function insert_knowledge_chunks(jsonb) from public, anon, authenticated;
+grant execute on function insert_knowledge_chunks(jsonb) to service_role;
+revoke all on function activate_snapshot(uuid) from public, anon, authenticated;
+grant execute on function activate_snapshot(uuid) to service_role;
+revoke all on function log_chat_outcome(text, text, numeric) from public, anon, authenticated;
+grant execute on function log_chat_outcome(text, text, numeric) to service_role;

@@ -2,6 +2,10 @@ import type { ChatLogInput, ChunkInput, Repository, RepositoryClient, RetrievedC
 
 const DIMENSIONS = 1536;
 const DEFAULT_THRESHOLD = 0.72;
+
+function assertEmbedding(embedding: number[]): void {
+  if (embedding.length !== DIMENSIONS || embedding.some((value) => typeof value !== "number" || !Number.isFinite(value))) throw new Error("Embedding must contain 1536 finite dimensions");
+}
 type RawChunk = Record<string, unknown>;
 
 function mapChunk(row: RawChunk): RetrievedChunk | null {
@@ -34,7 +38,7 @@ export function createRepository(client: RepositoryClient): Repository {
     async insertChunks(input: ChunkInput[] | ChunkInput): Promise<void> {
       const chunks = Array.isArray(input) ? input : [input];
       for (const chunk of chunks) {
-        if (chunk.embedding.length !== DIMENSIONS) throw new Error("Embedding must contain 1536 dimensions");
+        assertEmbedding(chunk.embedding);
       }
       const result = await client.rpc("insert_knowledge_chunks", { p_chunks: chunks.map((chunk) => ({ source_id: chunk.sourceId, snapshot_id: chunk.snapshotId, text_content: chunk.content, embedding: chunk.embedding, section: chunk.section ?? null, content_hash: chunk.contentHash ?? null })) });
       if (result.error) throw new Error(`Repository chunk insert failed: ${result.error.message}`);
