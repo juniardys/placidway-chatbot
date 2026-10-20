@@ -21,6 +21,19 @@ function mapChunk(row: RawChunk): RetrievedChunk | null {
 
 export function createRepository(client: RepositoryClient): Repository {
   return {
+    async getActiveHashes(): Promise<Record<string, string>> {
+      const result = await client.rpc("get_active_source_hashes", {});
+      if (result.error) throw new Error(`Repository hash lookup failed: ${result.error.message}`);
+      return Object.fromEntries((result.data ?? []).flatMap((row) => {
+        const value = row as { source_id?: unknown; content_hash?: unknown };
+        return typeof value.source_id === "string" && typeof value.content_hash === "string" ? [[value.source_id, value.content_hash]] : [];
+      }));
+    },
+    async refreshAtomically(sources) {
+      const payload = sources.map((source) => ({ source_id: source.sourceId, raw_content: source.rawContent, normalized_markdown: source.normalizedMarkdown, content_hash: source.contentHash, chunks: source.chunks.map((chunk) => ({ source_id: chunk.sourceId, content: chunk.content, embedding: chunk.embedding, section: chunk.section ?? null, content_hash: chunk.contentHash ?? null })) }));
+      const result = await client.rpc("refresh_knowledge_base", { p_sources: payload });
+      if (result.error) throw new Error(`Repository atomic refresh failed: ${result.error.message}`);
+    },
     async getActiveChunks(queryEmbedding: number[], limit: number): Promise<RetrievedChunk[]> {
       assertEmbedding(queryEmbedding);
       if (!Number.isInteger(limit) || limit <= 0) throw new Error("Limit must be positive");

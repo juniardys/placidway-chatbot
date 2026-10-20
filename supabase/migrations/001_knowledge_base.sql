@@ -144,3 +144,21 @@ revoke all on function activate_snapshot(uuid) from public, anon, authenticated;
 grant execute on function activate_snapshot(uuid) to service_role;
 revoke all on function log_chat_outcome(text, text, numeric) from public, anon, authenticated;
 grant execute on function log_chat_outcome(text, text, numeric) to service_role;
+
+create or replace function get_active_source_hashes()
+returns table(source_id text, content_hash text) language sql stable security definer set search_path = public, pg_temp as $$ select source_id, content_hash from knowledge_snapshots where active = true and status = 'active'; $$;
+
+create or replace function refresh_knowledge_base(p_sources jsonb)
+returns void language plpgsql security definer set search_path = public, pg_temp as $$
+declare x jsonb; snapshot_id uuid;
+begin
+ if jsonb_typeof(p_sources) <> 'array' or jsonb_array_length(p_sources) = 0 then raise exception 'Refresh payload must be non-empty'; end if;
+ for x in select * from jsonb_array_elements(p_sources) loop
+  insert into knowledge_snapshots(source_id, raw_content, normalized_markdown, content_hash, status) values (x->>'source_id', x->>'raw_content', x->>'normalized_markdown', x->>'content_hash', 'pending') returning id into snapshot_id;
+  insert into knowledge_chunks(source_id, snapshot_id, text_content, embedding, section, content_hash) select x->>'source_id', snapshot_id, c->>'content', (c->'embedding')::text::vector, nullif(c->>'section','null'), nullif(c->>'content_hash','null') from jsonb_array_elements(x->'chunks') c;
+ end loop;
+ update knowledge_snapshots set active = false where active = true;
+ update knowledge_chunks set active = false where active = true;
+ update knowledge_snapshots set active = true, status = 'active' where status = 'pending' and created_at >= now() - interval '1 minute';
+ update knowledge_chunks set active = true where snapshot_id in (select id from knowledge_snapshots where status = 'active' and created_at >= now() - interval '1 minute');
+end; $$;

@@ -39,8 +39,12 @@ export type ChunkInput = {
   contentHash?: string | null;
 };
 
+export type AtomicRefreshSource = { sourceId: string; rawContent: string; normalizedMarkdown: string; contentHash: string; chunks: ChunkInput[] };
+
 export type Repository = {
   getActiveChunks(queryEmbedding: number[], limit: number): Promise<RetrievedChunk[]>;
+  getActiveHashes(): Promise<Record<string, string>>;
+  refreshAtomically(sources: AtomicRefreshSource[]): Promise<void>;
   insertSourceSnapshot(input: SourceSnapshotInput): Promise<string>;
   insertChunks(input: ChunkInput[] | ChunkInput): Promise<void>;
   activateSnapshot(snapshotId: string): Promise<void>;
