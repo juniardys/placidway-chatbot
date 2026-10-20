@@ -1,19 +1,25 @@
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import { getServerEnv } from "../env";
-export function getChatModel() {
-  const e = getServerEnv();
+
+function endpoint(): string {
+  return getServerEnv().LLM_ENDPOINT.replace(/\/+$/, "");
+}
+
+export function getChatModel(): ChatOpenAI {
+  const env = getServerEnv();
   return new ChatOpenAI({
-    apiKey: e.LLM_API_KEY,
-    model: e.LLM_MODEL,
-    configuration: { baseURL: e.LLM_ENDPOINT },
+    apiKey: env.LLM_API_KEY,
+    model: env.LLM_MODEL,
+    configuration: { baseURL: endpoint() },
   });
 }
-export function getEmbeddings() {
-  const e = getServerEnv();
+
+export function getEmbeddings(): OpenAIEmbeddings {
+  const env = getServerEnv();
   return new OpenAIEmbeddings({
-    apiKey: e.LLM_API_KEY,
-    model: e.EMBEDDING_MODEL,
-    dimensions: e.EMBEDDING_DIMENSIONS,
-    configuration: { baseURL: e.LLM_ENDPOINT },
+    apiKey: env.LLM_API_KEY,
+    model: env.EMBEDDING_MODEL,
+    dimensions: 1536,
+    configuration: { baseURL: endpoint() },
   });
 }
