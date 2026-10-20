@@ -31,12 +31,16 @@ describe("POST /api/chat", () => {
   });
 
   test("rejects unavailable backend with 500", async () => {
+    // bun test auto-loads .env; remove the server key so the backend is truly unavailable.
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     const response = await POST(
       new Request("http://localhost/api/chat", {
         method: "POST",
         body: JSON.stringify({ question: "hello" }),
       }),
     );
+    if (serviceKey !== undefined) process.env.SUPABASE_SERVICE_ROLE_KEY = serviceKey;
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
       error: "Unable to process request",

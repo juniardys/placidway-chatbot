@@ -28,6 +28,9 @@ function htmlToMarkdown(html: string): { title: string; markdown: string } {
     .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, "\n$1\n")
     .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "\n- $1")
     .replace(/<[^>]+>/g, "")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/&quot;/gi, '"')
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
@@ -37,9 +40,33 @@ function htmlToMarkdown(html: string): { title: string; markdown: string } {
     .trim();
   return {
     title: title || markdown.match(/^#\s+(.+)$/m)?.[1] || "Untitled",
-    markdown,
+    markdown: extractMainContent(markdown),
   };
 }
+
+// PlacidWay pages wrap the page body in site chrome: navigation before the H1
+// and randomized "related" widgets, view counters, and footer after the quote
+// form. That chrome leaks other clinics' prices into chunks and changes on every
+// fetch, so keep only the H1 through the first site-wide trailing section.
+const TRAILING_BOILERPLATE =
+  /^#{2,3}\s+(Request your Free Quote|Trusted Medical Tourism Platform|Follow PlacidWay|The PlacidWay Network)\b/im;
+// Randomized cross-links inside the body; dropped up to the next heading.
+const INLINE_BOILERPLATE = /^#{2,4}\s+Related Experiences:?[^\n]*\n[\s\S]*?(?=^#{1,6}\s)/gim;
+
+export function extractMainContent(markdown: string): string {
+  const start = markdown.search(/^#\s+\S/m);
+  let body = start >= 0 ? markdown.slice(start) : markdown;
+  const end = body.search(TRAILING_BOILERPLATE);
+  if (end > 0) body = body.slice(0, end);
+  return body
+    .replace(INLINE_BOILERPLATE, "")
+    .replace(/^\s*-->\s*$/gm, "")
+    // Bare numbers on their own line are view/like counters that change per fetch.
+    .replace(/^\s*\d[\d.,]*[KM]?\s*$/gm, "")
+    .replace(/\n\s*\n+/g, "\n\n")
+    .trim();
+}
+
 export async function normalizeSource(
   raw: RawSnapshot,
 ): Promise<NormalizedDocument> {

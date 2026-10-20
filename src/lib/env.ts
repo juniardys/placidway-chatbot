@@ -11,7 +11,7 @@ const schema = z.object({
   INGESTION_CRON_TIMEZONE: z.string().default("UTC"),
   INGESTION_USER_AGENT: z.string().default("PlacidWayKnowledgeBot/1.0"),
   RETRIEVAL_TOP_K: z.coerce.number().int().default(6),
-  RETRIEVAL_MIN_SCORE: z.coerce.number().default(0.72),
+  RETRIEVAL_MIN_SCORE: z.coerce.number().default(0.5),
   MAX_HISTORY_MESSAGES: z.coerce.number().int().default(10),
   NEXT_PUBLIC_APP_URL: z.string().default("http://localhost:3000"),
 });

@@ -30,8 +30,8 @@ export type RefreshDeps = {
 let running = false;
 function safeFailure(error: unknown): string {
   const message = error instanceof Error ? error.message : "Refresh failed";
-  if (/api[_ -]?key|fetch|http|source/i.test(message)) return "Source fetch failed";
-  if (/secret|key|token|password|authorization|bearer/i.test(message))
+  if (/api[_ -]?key|fetch|http|source|robots/i.test(message)) return "Source fetch failed";
+  if (/secret|token|password|authorization|bearer/i.test(message))
     return "Refresh failed";
   if (/robots/i.test(message)) return "Source disallowed by robots policy";
   if (/embedding/i.test(message)) return "Embedding failed";

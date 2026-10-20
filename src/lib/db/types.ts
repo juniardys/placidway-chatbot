@@ -21,24 +21,6 @@ export type ChatLogInput = {
   confidence?: number;
 };
 
-export type SourceSnapshotInput = {
-  id?: string;
-  sourceId: string;
-  rawContent: string;
-  normalizedMarkdown: string;
-  contentHash: string;
-  status?: string;
-};
-
-export type ChunkInput = {
-  sourceId: string;
-  snapshotId: string;
-  content: string;
-  embedding: number[];
-  section?: string | null;
-  contentHash?: string | null;
-};
-
 export type AtomicRefreshChunk = {
   content: string;
   embedding: number[];
@@ -67,9 +49,6 @@ export type Repository = {
   ): Promise<RetrievedChunk[]>;
   getActiveHashes(): Promise<Record<string, string>>;
   refreshAtomically(sources: AtomicRefreshSource[]): Promise<void>;
-  insertSourceSnapshot(input: SourceSnapshotInput): Promise<string>;
-  insertChunks(input: ChunkInput[] | ChunkInput): Promise<void>;
-  activateSnapshot(snapshotId: string): Promise<void>;
   logChatOutcome(input: ChatLogInput): Promise<void>;
 };
 

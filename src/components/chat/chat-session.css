@@ -1,0 +1,25 @@
+.reset-chat {
+  margin-left: auto;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.reset-chat:hover:not(:disabled) {
+  border-color: var(--blue);
+  background: var(--paper);
+}
+.reset-chat:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.reset-chat:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -29,7 +29,7 @@ export const MAX_QUESTION_LENGTH = boundedInt(
   2000,
 );
 export const RETRIEVAL_TOP_K = boundedInt(process.env.RETRIEVAL_TOP_K, 6, 50);
-export const RETRIEVAL_MIN_SCORE = score(process.env.RETRIEVAL_MIN_SCORE, 0.72);
+export const RETRIEVAL_MIN_SCORE = score(process.env.RETRIEVAL_MIN_SCORE, 0.5);
 
 export const UNKNOWN_RESPONSE =
   "I could not find that information in the approved PlacidWay content. Please contact PlacidWay for a free quote.";

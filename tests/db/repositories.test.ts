@@ -2,29 +2,72 @@ import { describe, expect, test } from "vitest";
 import { createRepository } from "../../src/lib/db/repositories";
 
 describe("repository", () => {
-  test("retrieves active chunks through direct table queries", async () => {
+  test("retrieves through vector RPC instead of scanning the chunk table", async () => {
     const calls: unknown[] = [];
     const client = {
       from: (table: string) => {
         calls.push(["from", table]);
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                eq: () => ({
-                  eq: () => ({
-                    data: [],
-                    error: null,
-                  }),
-                }),
-              }),
-            }),
-          }),
-        };
+        throw new Error("table scan not expected");
+      },
+      rpc: async (name: string) => {
+        calls.push(["rpc", name]);
+        return { data: [], error: null };
       },
     };
     await createRepository(client as any).getActiveChunks(Array(1536).fill(0.1), 6);
-    expect(calls).toContainEqual(["from", "knowledge_chunks"]);
+    expect(calls).toEqual([["rpc", "match_knowledge_chunks"]]);
+  });
+
+  test("stages new snapshot inactive, then activates it before retiring the old one", async () => {
+    const calls: string[] = [];
+    const builder = (table: string, op: string, result: unknown = { data: null, error: null }) => {
+      calls.push(`${op} ${table}`);
+      const chain: any = {
+        select: () => chain,
+        single: () => chain,
+        eq: () => chain,
+        neq: () => chain,
+        then: (resolve: (value: unknown) => void) => resolve(result),
+      };
+      return chain;
+    };
+    const client = {
+      rpc: async () => ({ data: null, error: null }),
+      from: (table: string) => ({
+        upsert: () => builder(table, "upsert"),
+        insert: (row: any) =>
+          builder(table, Array.isArray(row) ? `insert(active=${row[0].active})` : `insert(active=${row.active})`, {
+            data: { id: "snap-1" },
+            error: null,
+          }),
+        update: (values: any) => builder(table, `update(active=${values.active})`),
+        delete: () => builder(table, "delete"),
+      }),
+    };
+    await createRepository(client as any).refreshAtomically([
+      {
+        sourceId: "s1",
+        title: "T",
+        url: "https://example.com",
+        pageType: "content",
+        rawContent: "raw",
+        normalizedMarkdown: "md",
+        contentHash: "h",
+        chunks: [{ content: "c", embedding: Array(1536).fill(0.1), section: "S", contentHash: "h" }],
+      },
+    ]);
+    expect(calls).toEqual([
+      "upsert knowledge_sources",
+      "insert(active=false) knowledge_snapshots",
+      "insert(active=false) knowledge_chunks",
+      "update(active=true) knowledge_chunks",
+      "update(active=true) knowledge_snapshots",
+      "update(active=false) knowledge_chunks",
+      "update(active=false) knowledge_snapshots",
+      "update(active=undefined) knowledge_sources",
+      "delete knowledge_chunks",
+      "delete knowledge_snapshots",
+    ]);
   });
 
   test("retrieves active chunks through vector RPC with threshold", async () => {
@@ -63,7 +106,7 @@ describe("repository", () => {
     });
     expect(calls[0]).toEqual([
       "match_knowledge_chunks",
-      expect.objectContaining({ match_count: 6, match_threshold: 0.72 }),
+      expect.objectContaining({ match_count: 6, match_threshold: 0.5 }),
     ]);
   });
 
@@ -85,30 +128,5 @@ describe("repository", () => {
     await expect(
       createRepository(client).getActiveChunks(Array(1536).fill(0), 0),
     ).rejects.toThrow("positive");
-  });
-
-  test("validates write payloads before RPC", async () => {
-    const calls: unknown[] = [];
-    const client = {
-      rpc: async (name: string, args: unknown) => {
-        calls.push([name, args]);
-        return { data: [{ id: "s1" }], error: null };
-      },
-    };
-    const repository = createRepository(client);
-    await expect(
-      repository.insertChunks({
-        sourceId: "s",
-        snapshotId: "x",
-        content: "c",
-        embedding: [Number.POSITIVE_INFINITY],
-      }),
-    ).rejects.toThrow("finite");
-    await expect(
-      repository.activateSnapshot("missing"),
-    ).resolves.toBeUndefined();
-    expect(calls).toEqual([
-      ["activate_snapshot", { p_snapshot_id: "missing" }],
-    ]);
   });
 });

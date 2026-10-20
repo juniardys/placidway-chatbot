@@ -9,6 +9,11 @@ export type DocumentChunk = {
   contentHash?: string;
 };
 export type SemanticChunk = DocumentChunk;
+// Sections shorter than this are merged with the following ones so pages made of
+// many tiny headed cards (videos, testimonials) do not explode into hundreds of
+// low-signal chunks.
+const MIN_CHUNK_CHARS = 400;
+
 export function chunkByHeading(
   markdown: string,
   maxChars = 1800,
@@ -17,38 +22,42 @@ export function chunkByHeading(
   const chunks: DocumentChunk[] = [];
   let section = "Document";
   let buffer = "";
-  const add = (content: string) => {
+  let bufferSection = section;
+  const add = (content: string, chunkSection: string) => {
     if (content.trim())
       chunks.push({
         ...metadata,
         content: content.trim(),
-        section,
+        section: chunkSection,
         index: chunks.length,
       });
   };
   const flush = () => {
-    add(buffer);
+    add(buffer, bufferSection);
     buffer = "";
+  };
+  const append = (text: string) => {
+    if (buffer && buffer.length + text.length + 2 > maxChars) flush();
+    if (!buffer) bufferSection = section;
+    buffer = buffer ? `${buffer}\n\n${text}` : text;
   };
   for (const block of markdown.split(/\n\s*\n/)) {
     const heading = block.match(/^#{1,6}\s+(.+)$/m);
     if (heading) {
-      flush();
+      if (buffer.length >= MIN_CHUNK_CHARS) flush();
       section = heading[1].trim();
       continue;
     }
-    let remaining = block;
-    while (remaining.length > maxChars) {
-      const at = Math.max(1, remaining.slice(0, maxChars).lastIndexOf(" "));
-      add(`${section}\n${remaining.slice(0, at)}`.slice(0, maxChars));
+    let remaining = block.trim();
+    if (!remaining) continue;
+    while (`${section}\n${remaining}`.length > maxChars) {
+      flush();
+      const room = Math.max(1, maxChars - section.length - 1);
+      const at = Math.max(1, remaining.slice(0, room).lastIndexOf(" "));
+      add(`${section}\n${remaining.slice(0, at)}`.slice(0, maxChars), section);
       remaining = remaining.slice(at).trimStart();
     }
-    if (remaining) {
-      const candidate = `${section}\n${remaining}`;
-      if (candidate.length > maxChars) flush();
-      else buffer = `${buffer ? `${buffer}\n\n` : ""}${candidate}`;
-    }
-    if (buffer.length >= maxChars) flush();
+    if (remaining) append(`${section}\n${remaining}`);
   }
   flush();
   return chunks;

@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -268,56 +268,6 @@ button:disabled {
   flex-direction: column;
   gap: 18px;
   padding: 27px 0;
-}
-.message {
-  max-width: 78%;
-  padding: 15px 18px;
-  border-radius: 17px;
-}
-.message.user {
-  align-self: flex-end;
-  background: var(--blue);
-  color: white;
-  border-bottom-right-radius: 4px;
-}
-.message.assistant {
-  align-self: flex-start;
-  background: #edf5f1;
-  border-bottom-left-radius: 4px;
-}
-.message-label {
-  margin-bottom: 7px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  opacity: 0.65;
-}
-.message p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.65;
-  white-space: pre-wrap;
-}
-.citations {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 14px;
-  padding-top: 11px;
-  border-top: 1px solid #b8d8cf;
-}
-.citations span {
-  width: 100%;
-  color: #557f76;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-.citations a {
-  color: var(--blue);
-  font-size: 11px;
-  text-decoration: none;
 }
 .typing {
   display: flex;

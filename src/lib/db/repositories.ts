@@ -1,15 +1,15 @@
+import { RETRIEVAL_MIN_SCORE } from "../constants";
 import type {
   AtomicRefreshSource,
   ChatLogInput,
-  ChunkInput,
   Repository,
   RepositoryClient,
   RetrievedChunk,
-  SourceSnapshotInput,
 } from "./types";
 
 const DIMENSIONS = 1536;
-const DEFAULT_THRESHOLD = 0.72;
+const CHUNK_INSERT_BATCH = 50;
+const DEFAULT_THRESHOLD = RETRIEVAL_MIN_SCORE;
 
 function assertEmbedding(embedding: number[]): void {
   if (
@@ -86,7 +86,12 @@ export function createRepository(client: RepositoryClient): Repository {
         for (const chunk of source.chunks) assertEmbedding(chunk.embedding);
       }
       if (!client.from) throw new Error("Repository client is not configured");
-      const createdSnapshots: string[] = [];
+      const fail = (step: string, error: { message: string } | null | undefined) => {
+        if (error) throw new Error(`Repository atomic refresh failed (${step}): ${error.message}`);
+      };
+      // Phase 1: stage every source as an inactive "pending" snapshot. Nothing
+      // is visible to retrieval yet, so a failure here only needs cleanup.
+      const staged: { source: AtomicRefreshSource; snapshotId: string }[] = [];
       try {
         for (const source of sources) {
           const sourceResult = await client.from("knowledge_sources").upsert({
@@ -97,42 +102,73 @@ export function createRepository(client: RepositoryClient): Repository {
             active: true,
             updated_at: new Date().toISOString(),
           });
-          if (sourceResult.error) throw new Error(sourceResult.error.message);
-          const snapshotResult = await client.from("knowledge_snapshots").insert({
-            source_id: source.sourceId,
-            raw_content: source.rawContent,
-            normalized_markdown: source.normalizedMarkdown,
-            content_hash: source.contentHash,
-            status: "active",
-            active: true,
-          }).select("id").single();
-          if (snapshotResult.error) throw new Error(snapshotResult.error.message);
+          fail("source upsert", sourceResult.error);
+          const snapshotResult = await client
+            .from("knowledge_snapshots")
+            .insert({
+              source_id: source.sourceId,
+              raw_content: source.rawContent,
+              normalized_markdown: source.normalizedMarkdown,
+              content_hash: source.contentHash,
+              status: "pending",
+              active: false,
+            })
+            .select("id")
+            .single();
+          fail("snapshot insert", snapshotResult.error);
           const snapshotId = snapshotResult.data?.id;
           if (typeof snapshotId !== "string") throw new Error("Snapshot ID missing");
-          createdSnapshots.push(snapshotId);
-          const chunkResult = await client.from("knowledge_chunks").insert(
-            source.chunks.map((chunk) => ({
-              source_id: source.sourceId,
-              snapshot_id: snapshotId,
-              text_content: chunk.content,
-              embedding: chunk.embedding,
-              section: chunk.section ?? null,
-              content_hash: chunk.contentHash ?? null,
-              active: true,
-            })),
-          );
-          if (chunkResult.error) throw new Error(chunkResult.error.message);
-          await client.from("knowledge_snapshots").update({ active: false }).eq("source_id", source.sourceId).neq("id", snapshotId);
-          await client.from("knowledge_chunks").update({ active: false }).eq("source_id", source.sourceId).neq("snapshot_id", snapshotId);
-          await client.from("knowledge_sources").update({ latest_content_hash: source.contentHash }).eq("id", source.sourceId);
+          staged.push({ source, snapshotId });
+          for (let start = 0; start < source.chunks.length; start += CHUNK_INSERT_BATCH) {
+            const chunkResult = await client.from("knowledge_chunks").insert(
+              source.chunks.slice(start, start + CHUNK_INSERT_BATCH).map((chunk) => ({
+                source_id: source.sourceId,
+                snapshot_id: snapshotId,
+                text_content: chunk.content,
+                embedding: chunk.embedding,
+                section: chunk.section ?? null,
+                content_hash: chunk.contentHash ?? null,
+                active: false,
+              })),
+            );
+            fail("chunk insert", chunkResult.error);
+          }
         }
-        return;
       } catch (error) {
-        for (const snapshotId of createdSnapshots) {
+        for (const { snapshotId } of staged) {
           await client.from("knowledge_chunks").delete().eq("snapshot_id", snapshotId);
           await client.from("knowledge_snapshots").delete().eq("id", snapshotId);
         }
-        throw new Error(`Repository atomic refresh failed: ${error instanceof Error ? error.message : "unknown"}`);
+        throw error;
+      }
+      // Phase 2: per source, activate the new snapshot before retiring the old
+      // one, so retrieval never sees a source with zero active chunks.
+      for (const { source, snapshotId } of staged) {
+        fail(
+          "chunk activation",
+          (await client.from("knowledge_chunks").update({ active: true }).eq("snapshot_id", snapshotId)).error,
+        );
+        fail(
+          "snapshot activation",
+          (await client.from("knowledge_snapshots").update({ active: true, status: "active" }).eq("id", snapshotId)).error,
+        );
+        fail(
+          "old chunk retirement",
+          (await client.from("knowledge_chunks").update({ active: false }).eq("source_id", source.sourceId).neq("snapshot_id", snapshotId)).error,
+        );
+        fail(
+          "old snapshot retirement",
+          (await client.from("knowledge_snapshots").update({ active: false }).eq("source_id", source.sourceId).neq("id", snapshotId)).error,
+        );
+        fail(
+          "source hash update",
+          (await client.from("knowledge_sources").update({ latest_content_hash: source.contentHash }).eq("id", source.sourceId)).error,
+        );
+        // Best-effort pruning of retired rows; the refresh already succeeded,
+        // so leftovers are only cleaned up again on the next change.
+        const pruned = await client.from("knowledge_chunks").delete().eq("source_id", source.sourceId).eq("active", false);
+        if (!pruned.error)
+          await client.from("knowledge_snapshots").delete().eq("source_id", source.sourceId).eq("active", false);
       }
     },
     async getActiveChunks(
@@ -142,68 +178,6 @@ export function createRepository(client: RepositoryClient): Repository {
       assertEmbedding(queryEmbedding);
       if (!Number.isInteger(limit) || limit <= 0)
         throw new Error("Limit must be positive");
-      if (client.from) {
-        const result = await client
-          .from("knowledge_chunks")
-          .select(
-            "id, source_id, text_content, section, content_hash, embedding, knowledge_sources!inner(title, url, page_type), knowledge_snapshots!inner(created_at, status)",
-          )
-          .eq("active", true)
-          .eq("knowledge_sources.active", true)
-          .eq("knowledge_snapshots.active", true)
-          .eq("knowledge_snapshots.status", "active");
-        if (result.error)
-          throw new Error(`Repository retrieval failed: ${result.error.message}`);
-        return (result.data ?? [])
-          .map((row: any) => {
-            const source = Array.isArray(row.knowledge_sources)
-              ? row.knowledge_sources[0]
-              : row.knowledge_sources;
-            const snapshot = Array.isArray(row.knowledge_snapshots)
-              ? row.knowledge_snapshots[0]
-              : row.knowledge_snapshots;
-            const embedding = Array.isArray(row.embedding)
-              ? row.embedding
-              : typeof row.embedding === "string"
-                ? row.embedding
-                    .replace(/^\[|\]$/g, "")
-                    .split(",")
-                    .map(Number)
-                    .filter(Number.isFinite)
-                : [];
-            const magnitude = Math.sqrt(
-              embedding.reduce((sum: number, value: number) => sum + value * value, 0),
-            );
-            const queryMagnitude = Math.sqrt(
-              queryEmbedding.reduce((sum, value) => sum + value * value, 0),
-            );
-            const similarity =
-              magnitude && queryMagnitude
-                ? embedding.reduce(
-                    (sum: number, value: number, index: number) =>
-                      sum + value * queryEmbedding[index],
-                    0,
-                  ) /
-                    (magnitude * queryMagnitude)
-                : 0;
-            return mapChunk({
-              id: row.id,
-              source_id: row.source_id,
-              content: row.text_content,
-              title: source?.title,
-              url: source?.url,
-              page_type: source?.page_type,
-              section: row.section,
-              fetched_at: snapshot?.created_at,
-              content_hash: row.content_hash,
-              similarity,
-            });
-          })
-          .filter((row: RetrievedChunk | null): row is RetrievedChunk => row !== null)
-          .filter((row: RetrievedChunk) => row.similarity >= DEFAULT_THRESHOLD)
-          .sort((a: RetrievedChunk, b: RetrievedChunk) => b.similarity - a.similarity)
-          .slice(0, limit);
-      }
       if (!client.rpc) throw new Error("Repository client is not configured");
       const { data, error } = await client.rpc("match_knowledge_chunks", {
         query_embedding: queryEmbedding,
@@ -215,53 +189,6 @@ export function createRepository(client: RepositoryClient): Repository {
       return (data ?? [])
         .map((row) => mapChunk(row as RawChunk))
         .filter((row): row is RetrievedChunk => row !== null);
-    },
-    async insertSourceSnapshot(input: SourceSnapshotInput): Promise<string> {
-      const result = await client.rpc("insert_source_snapshot", {
-        p_id: input.id ?? null,
-        p_source_id: input.sourceId,
-        p_raw_content: input.rawContent,
-        p_normalized_markdown: input.normalizedMarkdown,
-        p_content_hash: input.contentHash,
-        p_status: input.status ?? "pending",
-      });
-      if (result.error)
-        throw new Error(
-          `Repository snapshot insert failed: ${result.error.message}`,
-        );
-      const id = (result.data?.[0] as { id?: unknown } | undefined)?.id;
-      if (typeof id !== "string")
-        throw new Error("Repository snapshot insert returned invalid ID");
-      return id;
-    },
-    async insertChunks(input: ChunkInput[] | ChunkInput): Promise<void> {
-      const chunks = Array.isArray(input) ? input : [input];
-      for (const chunk of chunks) {
-        assertEmbedding(chunk.embedding);
-      }
-      const result = await client.rpc("insert_knowledge_chunks", {
-        p_chunks: chunks.map((chunk) => ({
-          source_id: chunk.sourceId,
-          snapshot_id: chunk.snapshotId,
-          text_content: chunk.content,
-          embedding: chunk.embedding,
-          section: chunk.section ?? null,
-          content_hash: chunk.contentHash ?? null,
-        })),
-      });
-      if (result.error)
-        throw new Error(
-          `Repository chunk insert failed: ${result.error.message}`,
-        );
-    },
-    async activateSnapshot(snapshotId: string): Promise<void> {
-      const result = await client.rpc("activate_snapshot", {
-        p_snapshot_id: snapshotId,
-      });
-      if (result.error)
-        throw new Error(
-          `Repository snapshot activation failed: ${result.error.message}`,
-        );
     },
     async logChatOutcome(input: ChatLogInput): Promise<void> {
       const result = await client.rpc("log_chat_outcome", {
