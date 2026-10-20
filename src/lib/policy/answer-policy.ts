@@ -1,5 +1,6 @@
 import {
   APPOINTMENT_RESPONSE,
+  COMPARISON_INSUFFICIENT_RESPONSE,
   MEDICAL_DISCLAIMER,
   OUT_OF_SCOPE_RESPONSE,
   UNSUPPORTED_PREMISE_RESPONSE,
@@ -21,6 +22,7 @@ export type PolicyDecision = {
   kind: PolicyKind;
   requireEvidence?: boolean;
   requireComparisonSides?: boolean;
+  insufficientComparisonResponse?: string;
   response?: string;
   disclaimerRequired?: boolean;
 };
@@ -52,13 +54,18 @@ export function classifyQuestion(question: string): PolicyDecision {
   // A stated amount is not evidence of the actual price. Refuse premise instead of guessing.
   if (
     has(s, /does .* cost|is .* \$\s*\d|is .*\b\d[\d,]*(?:\.\d+)?\s*(?:usd|dollars?|€|eur|£|gbp)\b/) &&
-    has(s, /really|จริง|จริงไหม|listed|advertised|only|just|เชื่อม/) 
+    has(s, /really|จริง|จริงไหม|listed|advertised|only|just|available|available for|เชื่อม/) 
   ) {
     return { kind: "unsupported-premise", requireEvidence: true, response: UNSUPPORTED_PREMISE_RESPONSE };
   }
 
   if (has(s, /compare|comparison|versus|\bvs\.?\b|difference between|which is (?:cheaper|better)/)) {
-    return { kind: "comparison", requireEvidence: true, requireComparisonSides: true };
+    return {
+      kind: "comparison",
+      requireEvidence: true,
+      requireComparisonSides: true,
+      insufficientComparisonResponse: COMPARISON_INSUFFICIENT_RESPONSE,
+    };
   }
 
   if (has(s, /price|cost|how much|fee|starting from|expensive|budget|料金/)) {

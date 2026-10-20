@@ -29,7 +29,15 @@ describe("answer policy", () => {
   });
 
   test("unsupported premise has explicit controlled response", () => {
-    expect(classifyQuestion("Is it really only $50?").response).toBe(UNSUPPORTED_PREMISE_RESPONSE);
+    for (const question of ["Is it really only $50?", "Is it available for $50?"]) {
+      expect(classifyQuestion(question).kind).toBe("unsupported-premise");
+      expect(classifyQuestion(question).response).toBe(UNSUPPORTED_PREMISE_RESPONSE);
+    }
+  });
+
+  test("comparison exposes controlled insufficient-evidence response", () => {
+    const decision = classifyQuestion("Compare Turkey and Thailand");
+    expect(decision.insufficientComparisonResponse).toContain("reliable comparison");
   });
 
   test("ordinary numeric price question remains cost", () => {
